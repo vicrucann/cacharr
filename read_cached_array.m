@@ -60,6 +60,8 @@ else
 end
 end
 
+% Converts array of indices of form [0 0 2 0] into string '(:,:,2,:)' for
+% further eval usage
 function expr = ind2str(indices)
 expr = '(';
 for i = 1:size(indices,2)
