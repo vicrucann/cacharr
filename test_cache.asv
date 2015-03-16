@@ -1,0 +1,23 @@
+% Tester for caching function
+% The caching data structure assumes user processes their data in chunks
+% The user is responsible for chunk size determination and dimension
+% breakage
+
+dims = [1000, 1000, 100, 100];
+type = 'single';
+path = 'cache/\';
+num_chunks = 20;
+idx_broken = 2; % which dimensio
+caching = -1; % 0 for caching OFF, 1 for caching ON, -1 automatic caching
+carr = create_cached_array(dims, path, type, num_chunks, idx_broken, caching);
+
+for i = 1 : num_chunks
+    chunk = rand([dims(1) dims(2)/num_chunks dims(3) dims(4)], type);
+    carr = write_cached_array(carr, chunk, i);
+    
+    chunk_x = read_cached_array(carr, [0, 300, 0, 1]);
+    if (~isequal(chunk_x, chunk(:,300,:,1)))
+        error('Matrix equality failed');
+    end
+    progress_bar(i, num_chunks);
+end
