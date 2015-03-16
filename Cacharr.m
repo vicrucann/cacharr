@@ -97,7 +97,7 @@ classdef Cacharr < handle % always pass by reference!
                     indices(carr.broken+1) = size(carr.data, carr.broken);
                 end
                 expr_ind = ind2str_wr(indices);
-                eval(['cacharr.data' expr_ind '=chunk;']);
+                eval(['carr.data' expr_ind '=chunk;']);
                 %if (idx_chunk < carr.nchunks)
                 %    carr.data(:,batchsize*(idx_chunk-1)+1:batchsize*idx_chunk,:,:) = chunk;
                 %else
@@ -162,7 +162,7 @@ classdef Cacharr < handle % always pass by reference!
                 %chunk_x = cacharr.data(:,:,indices(3), indices(4));
             end
              expr_ind = ind2str_rd(ind);
-             chunk_x = eval(['cacharr.data' expr_ind  ';']); % general, N-dimensional array
+             chunk_x = eval(['carr.data' expr_ind  ';']); % general, N-dimensional array
         end
         
     end 

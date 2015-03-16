@@ -21,8 +21,8 @@ for i = 1 : num_chunks
     carr.write_cached_array_chunk(chunk, i);
     
     %chunk_x = read_cached_array(carr, [0, 300, 0, 1]);
-    chunk_x = carr.read_cached_array([0, 300, 0, 1]);
-    if (~isequal(chunk_x, chunk(:,300,:,1)))
+    chunk_x = carr.read_cached_array([0, 50, 0, 1]);
+    if (~isequal(chunk_x, chunk(:,50,:,1)))
         error('Matrix equality failed');
     end
     progress_bar(i, num_chunks);
