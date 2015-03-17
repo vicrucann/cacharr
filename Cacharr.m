@@ -1,8 +1,14 @@
-classdef Cacharr < handle % always pass by reference!
-    %Cacharr class for caching to deal with large matrices to avoid out of
-    %memory error
-    %   Caching a large array into several files on hard disk and then
-    %   reading them in chunks using memmapfile
+classdef Cacharr < handle
+    %Cacharr class - standalone data structure which allows caching of the
+    %large arrays
+    %   Allows to avoid Matlab out of memory error by caching large array
+    %   into several files on hard disk and then reading the necessary
+    %   chunks using memmapfile function
+    %   The data structure is inhereted from handle abstract class which
+    %   avoids parameter by value and supports parameter by reference
+    %   Contains three main functions: create, write and read with option
+    %   to automatically detect the need for caching (set caching to -1)
+    %   2015 victoria.rudakova(at)yale.edu
     
     properties (GetAccess = 'public', SetAccess = 'private')
         dimension;
@@ -10,10 +16,10 @@ classdef Cacharr < handle % always pass by reference!
         type;
         nchunks;
         broken;
-        caching;
+        caching = -1;
         data;
         currchunk = 1;
-        vname;
+        vname = 'tmp';
     end
     
     methods
