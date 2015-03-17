@@ -11,9 +11,9 @@ type = 'single'; % array type
 path = 'cache'; % cached folder, the data will be saved as num2str(i).dat
 num_chunks = 20; % number of total chunks
 idx_broken = 2; % which dimension will be broken
-caching = -1; % 0 for caching OFF, 1 for caching ON, -1 automatic caching
+caching = 1; % 0 for caching OFF, 1 for caching ON, -1 automatic caching
 %carr = create_cached_array(dims, path, type, num_chunks, idx_broken, caching);
-carr = Cacharr(dims, path, type, num_chunks, idx_broken, caching);
+carr = Cacharr(dims, path, type, num_chunks, idx_broken, caching, 'carr');
 
 for i = 1 : num_chunks
     chunk = rand([dims(1) dims(2)/num_chunks dims(3) dims(4)], type);
@@ -21,9 +21,11 @@ for i = 1 : num_chunks
     carr.write_cached_array_chunk(chunk, i);
     
     %chunk_x = read_cached_array(carr, [0, 300, 0, 1]);
-    chunk_x = carr.read_cached_array([0, 50, 0, 1]);
-    if (~isequal(chunk_x, chunk(:,50,:,1)))
+    chunk_x = carr.read_cached_array([0, (i-1)*dims(2)/num_chunks+50, 0, 1]);
+    cx = chunk(:,50,:,1);
+    if (~isequal(chunk_x, cx))
         error('Matrix equality failed');
     end
     progress_bar(i, num_chunks);
 end
+fprintf('\n');

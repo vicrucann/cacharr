@@ -13,10 +13,11 @@ classdef Cacharr < handle % always pass by reference!
         caching;
         data;
         currchunk = 1;
+        vname;
     end
     
     methods
-        function carr = Cacharr(size, path_cache, type, num_chunks, idx_broken, caching)
+        function carr = Cacharr(size, path_cache, type, num_chunks, idx_broken, caching, var_name)
             if ~exist(path_cache)
                 mkdir(path_cache);
             else
@@ -76,11 +77,12 @@ classdef Cacharr < handle % always pass by reference!
             carr.nchunks = num_chunks;
             carr.broken = idx_broken;
             carr.caching = caching;
+            carr.vname = var_name;
         end
         
         function carr = write_cached_array_chunk(carr, chunk, idx_chunk) % carr.write_cached_array_chunk(chunk, idx_chunk)
             if (carr.caching == 1)
-                fname = [num2str(idx_chunk) '.dat'];
+                fname = [carr.vname '_' num2str(idx_chunk) '.dat'];
                 fid = fopen([carr.path fname], 'Wb');
                 fwrite(fid, chunk, carr.type);
                 fclose(fid);
@@ -132,7 +134,7 @@ classdef Cacharr < handle % always pass by reference!
             if (carr.caching == 1)
                 nc = carr.nchunks; % number of chunks
                 ix = carr.broken; % idx of broken dimension
-                nx = carr.dimensions(ix); % total number of dimensions
+                nx = carr.dimension(ix); % total number of dimensions
                 dx = ceil(nx/nc); % number of dimensions per chunk
                 idx_chunk = ceil(indices(ix)/dx); % filename calculation
                 idx_data = mod(indices(ix), dx); % current chunk data offset based on broken idx
@@ -140,7 +142,7 @@ classdef Cacharr < handle % always pass by reference!
                     idx_data = dx;
                 end
                 if (idx_chunk > carr.currchunk && idx_chunk > 1)
-                    mm = memmapfile([carr.path num2str(idx_chunk) '.dat'], 'Format', carr.type);
+                    mm = memmapfile([carr.path carr.vname '_' num2str(idx_chunk) '.dat'], 'Format', carr.type);
                     carr.currchunk = idx_chunk;
                     if (idx_chunk == nc)
                         dx = nx-(nc-1)*dx; % the last chunk might have different size in broken dimension
