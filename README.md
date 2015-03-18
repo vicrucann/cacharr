@@ -13,4 +13,6 @@ Contains three main functions: constructor, write and read with option to automa
 
 The class was originally created as a part of a software package for fast 3d reconstruction of protein structure from microscopic images.
 
+To run a sample code, open and run "test_cache.m".
+
 2015 victoria.rudakova(at)yale.edu
