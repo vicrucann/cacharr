@@ -1,5 +1,6 @@
 % Tester for caching function
 % The caching data structure assumes user processes their data in chunks
+% SEQUENTIALLY
 % The user is responsible for chunk size determination and dimension
 % breakage
 % Victoria Rudakova 2015, victoria.rudakova(at)yale.edu
@@ -17,10 +18,10 @@ carr = Cacharr(dims, path, type, num_chunks, idx_broken, caching, 'carr');
 
 for i = 1 : num_chunks
     chunk = rand([dims(1) dims(2)/num_chunks dims(3) dims(4)], type);
-    %carr = write_cached_array_chunk(carr, chunk, i);
     carr.write_cached_array_chunk(chunk, i);
     
-    %chunk_x = read_cached_array(carr, [0, 300, 0, 1]);
+    % The loop does not need to be continious - read and write could be
+    % used in different loops, unless the usage is sequential
     chunk_x = carr.read_cached_array([0, (i-1)*dims(2)/num_chunks+50, 0, 1]);
     cx = chunk(:,50,:,1);
     if (~isequal(chunk_x, cx))
