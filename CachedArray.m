@@ -1,5 +1,5 @@
-classdef Cacharr < handle
-    %Cacharr class - standalone data structure which allows caching of the
+classdef CachedArray < handle
+    %CachedArray class - standalone data structure which allows caching of the
     %large arrays
     %   Allows to avoid Matlab out of memory error by caching large array
     %   into several files on hard disk and then reading the necessary
@@ -25,70 +25,81 @@ classdef Cacharr < handle
     
     methods
         % constructor
-        function carr = Cacharr(size, path_cache, type, num_chunks, idx_broken, caching, var_name)
-            if ~exist(path_cache)
-                mkdir(path_cache);
+        % size - dimensions of the array - vector
+        % type - data type, e.g. 'double', 'int', 'single' - string
+        % idx_broken - indices of the dimension to break - value or vector
+        % var_name - variable name to be saved - string (can be default)
+        % path_cache - folder where cached files are stored - string (can be default)
+        % num_chunks - number of chunks per each dimension - value or vector (can be default)
+        function carr = CachedArray(size, type, idx_broken, var_name, path_cache, num_chunks)
+            if (nargin < 6) 
+                num_chunks = zeros(1, length(idx_broken)); 
             else
-                delete([path_cache '\/*.dat']);
-                warning('Cache folder has been cleared from previous cache data.');
+                assert(length(num_chunks) == length(idx_broken));
+            end
+            if (nargin < 5) 
+                path_cache = 'cache'; 
+            end
+            if (nargin < 4) 
+                var_name = 'tmp'; 
+            end
+            if (nargin < 3) 
+                error('There must be at least 3 input parameters to create cached array variable.'); 
+            end
+            path_cache = path_corrected(path_cache);
+            assert(sum(idx_broken > length(size)) == 0); % make sure all broken dimensions are within the number of dimensions
+            carr.dimension = size;
+            carr.type = type;
+            carr.broken = idx_broken;
+            carr.vname = var_name;
+            carr.path = path_cache;
+            
+            reqmem = whos(size, type);
+            
+            archstr = computer('arch');
+            if (isequal(archstr(1:3), 'win')) % if it's windows
+                user = memory;
+                freemem = user.MaxPossibleArrayBytes;
+            elseif (isequal(archstr(1:5),'glnxa')) % if linux
+                [r, w] = unix('free | grep Mem');
+                stats = str2double(regexp(w, '[0-9]*', 'match'));
+                %memsize = stats(1); % bytes
+                freemem = (stats(3) + stats(end))*1000; % in bytes
+            else % mac?
+                error('Unrecognized or unsupported architecture');
             end
             
-            if caching == -1 % caching is determined automatically
-                if isequal(type, 'single')
-                    reqmem = 4; % bytes for single
-                else
-                    reqmem = 8; % assume it's double otherwise
-                end
-                for i = 1:length(size)
-                    reqmem = reqmem*size(i); % total size of variable in bytes
-                end
-                reqmem = 1.2*reqmem; % assume it's 20% more than required to allow for other side variables
-                
-                archstr = computer('arch');
-                if (isequal(archstr(1:3), 'win')) % if it's windows
-                    user = memory;
-                    if (user.MaxPossibleArrayBytes > reqmem)
-                        fprintf('No caching will be used, there is enough memory \n');
-                        caching = 0;
-                    else
-                        warning('Not enough memory: caching will be used. Processing time will be slower. ');
-                        caching = 1;
-                    end
-                elseif (isequal(archstr(1:5),'glnxa')) % if linux
-                    [r, w] = unix('free | grep Mem');
-                    stats = str2double(regexp(w, '[0-9]*', 'match'));
-                    %memsize = stats(1); % bytes
-                    freemem = stats(3) + stats(end); % bytes
-                    if (freemem > reqmem)
-                        fprintf('No caching will be used, there is enough memory \n');
-                        caching = 0;
-                    else
-                        warning('Not enough memory: caching will be used. Processing time will be slower. ');
-                        caching = 1;
-                    end
-                else % mac?
-                    error('Unrecognized or unsupported architecture');
-                end
-            end
-            if (~strcmp(path_cache(end), '\') && ~strcmp(path_cache(end), '/'))
-                path_cache = [path_cache '\/'];
+            if (freemem > 1.3*1.2*reqmem) % assume it's 20%*30% more than required to allow for other side variables
+                fprintf('No caching will be used, there is enough memory \n');
+                carr.caching = 0;
+            else
+                warning('Not enough memory: caching will be used. Processing time will be slower. ');
+                carr.caching = 1;
             end
             
-            if (caching == 0)
+            if (carr.caching == 0)
                 carr.data = zeros(size, type);
             else
                 carr.data = 0;
+                if (sum(num_chunks) == 0) % need to divide memory into number of chunks
+                    gb = 8; % assume each chunk will be no more than 8 gb
+                    num_chunks = floor(reqmem/(gb*1024^3));
+                    if (num_chunks == 0)
+                        error('Not enough memory for split, possible resolve: consider splitting along another dimension. Or, consider splitting along two dimensions (not supported in this version).');
+                    end
+                    
+                end
             end
-            carr.dimension = size;
-            carr.path = path_cache;
-            carr.type = type;
+            
             carr.nchunks = num_chunks;
-            carr.broken = idx_broken;
-            if (nargin == 6)
-                carr.caching = caching;
-            end
-            if (nargin == 7)
-                carr.vname = var_name;
+            
+            if ~exist(path_cache)
+                mkdir(path_cache);
+            else
+                if (carr.caching == 1)
+                    delete([path_cache var_name '*.dat']);
+                    warning('Cache folder has been cleared from previous cache data.');
+                end
             end
         end
         
@@ -216,5 +227,31 @@ for i = 1:size(indices,2)
     end
 end
 expr(end) = ')'; % get rid of the comma at the end and close the braket
+end
+
+function path_platform = path_corrected(path)
+archstr = computer('arch');
+if (strcmp(path(end), '\') || strcmp(path(end), '/'))
+    path = path(1:end-1);
+end
+path_platform = path;
+if (isequal(archstr(1:3), 'win')) % Windows
+    path_platform = [path_platform '\'];
+elseif (isequal(archstr(1:5),'glnxa')) % Linux
+    path_platform = [path_platform '/'];
+else % other
+    error('Unrecognized or unsupported architecture');
+end
+end
+
+function reqmem = whos(size, type)
+if isequal(type, 'single') 
+    reqmem = 4; % bytes for single
+else
+    reqmem = 8; % assume it's double otherwise
+end 
+for i = 1:length(size)
+    reqmem = reqmem*size(i); % total size of variable in bytes
+end
 end
 
