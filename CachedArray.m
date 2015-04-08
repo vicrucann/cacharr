@@ -14,13 +14,15 @@ classdef CachedArray < handle
         dimension; % size of the array
         path; % path where variables are saved
         type; % data type, e.g. double, int
-        nchunks; % total number of chunks
-        broken; % index of a broken dimension
+        nchunks; % number of chunks for each dimension
+        broken; % index of each broken dimension
         caching = -1; % 1 caching ON, 0 caching OFF, -1 automatic mode
         data; % contains either first chunk or whole data if no brakage was performed
         currchunk = 1; % pointed on chunk index which is stored in data currently
-        ichunk = 1; % pointer to next current chunk for write function
-        vname = 'tmp';
+        %ichunk = 1; % pointer to next current chunk for write function
+        vname = 'tmp'; % variable name under which the data will be saved on disk
+        lenchunk; % length of a regular chunk
+        lendchunk; % length of the end chunk (can be different than regular)
     end
     
     methods
@@ -50,7 +52,7 @@ classdef CachedArray < handle
             assert(sum(idx_broken > length(size)) == 0); % make sure all broken dimensions are within the number of dimensions
             carr.dimension = size;
             carr.type = type;
-            carr.broken = idx_broken;
+            carr.broken = idx_broken; % assume we deal with only 1 broken dimension (subject to change)
             carr.vname = var_name;
             carr.path = path_cache;
             
@@ -77,21 +79,24 @@ classdef CachedArray < handle
                 carr.caching = 1;
             end
             
+            carr.caching = 1; % test
+            
             if (carr.caching == 0)
                 carr.data = zeros(size, type);
             else
                 carr.data = 0;
                 if (sum(num_chunks) == 0) % need to divide memory into number of chunks
                     gb = 8; % assume each chunk will be no more than 8 gb
-                    num_chunks = floor(reqmem/(gb*1024^3));
+                    num_chunks = floor(reqmem/(gb*1024^3)); % assume we deal with only 1 broken dimension (subject to change)
                     if (num_chunks == 0)
-                        error('Not enough memory for split, possible resolve: consider splitting along another dimension. Or, consider splitting along two dimensions (not supported in this version).');
+                        error('Not enough memory for a split, possible resolve: consider splitting along another dimension. Or, consider splitting along few dimensions at the same time (not supported in this version).');
                     end
-                    
                 end
             end
             
             carr.nchunks = num_chunks;
+            carr.lenchunk = ceil(carr.dimension(carr.broken)/carr.nchunks);
+            carr.lendchunk = carr.dimension(carr.broken) - (carr.nchunks - 1) * carr.lenchunk;
             
             if ~exist(path_cache)
                 mkdir(path_cache);
@@ -100,6 +105,91 @@ classdef CachedArray < handle
                     delete([path_cache var_name '*.dat']);
                     warning('Cache folder has been cleared from previous cache data.');
                 end
+            end
+        end
+        
+        % operator overload - subscripted assignment (=writing to cached file)
+        function carr = subsasgn(carr, S, value)
+            switch S(1).type
+                case '()'
+                    if (carr.caching == 0) % if no caching, perform simply assignment
+                        carr.data = builtin('subsasgn', carr.data, S, value);                        
+                    else
+                        % Check the idx_chunk
+                        % Does it lie within 1 chunk?
+                        % Does it require loading from disk or that chunk
+                        % is already in memory (data)
+                        % ASSUME the data is saved by exact chunks
+                        idc_target = S(1).subs{carr.broken};
+                        first = idc_target(1);
+                        last = idc_target(end);
+                        assert(last-first+1 <= carr.lenchunk || last-first+1 <= carr.lendchunk); % assumption in work
+                        idx_chunk = ceil(first/carr.lenchunk);
+                        % q = subs2str(S(1).subs);
+                        
+                        % write to disc
+                        fname = [carr.vname '_' num2str(idx_chunk) '.dat'];
+                        fid = fopen([carr.path fname], 'Wb');
+                        fwrite(fid, value, carr.type);
+                        fclose(fid);
+                        if (idx_chunk ==  1)
+                            carr.data = value; % prepare data for the first use
+                        end
+                    end
+                otherwise
+                    carr = builtin('subsasgn', carr, S, value);
+            end
+        end
+        
+        % operator overload - subscripted reference (=reading from cached file)
+        function value = subsref(carr, S)
+            switch S(1).type
+                case '()'
+                    if (carr.caching == 0)
+                        value = builtin('subsref', carr, S);
+                    else
+                        % check indices have the right dimension
+                        if (length(S.subs) ~= size(carr.dimension,2))
+                            error('Indices length is too large or too small, the read data might be not correct');
+                        end
+                        % check the indices are in the right dimension range
+                        for i = 1:length(S.subs)
+                            if (strcmp(S.subs{i}, ':'))
+                                continue;
+                            end
+                            if (S.subs{i}(end) > carr.dimension(i))
+                                error('Index exceeds matrix dimensions.');
+                            end
+                        end
+                        idc_target = S(1).subs{carr.broken};
+                        first = idc_target(1);
+                        last = idc_target(end);
+                        assert(last-first+1 <= carr.lenchunk || last-first+1 <= carr.lendchunk); % assumption in work
+                        idx_chunk = ceil(first/carr.lenchunk); % filename calculation
+                        idx_data = mod(first, carr.lenchunk); % current chunk data offset based on broken idx
+                        if (idx_data == 0)
+                            idx_data = carr.lenchunk;
+                        end
+                        
+                        if (idx_chunk > carr.currchunk && idx_chunk > 1)
+                            mm = memmapfile([carr.path carr.vname '_' num2str(idx_chunk) '.dat'], 'Format', carr.type);
+                            carr.currchunk = idx_chunk;
+                            dx = carr.lenchunk;
+                            if (idx_chunk == carr.nchunks)
+                                dx = carr.lendchunk; % the last chunk might have different size in broken dimension
+                            end
+                            dims = carr.dimension;
+                            dims(carr.broken) = dx; % broken dimension has different size than original array
+                            carr.data = reshape(mm.Data, dims);
+                        end
+                        % edit S.subs so that indexing is ok
+                        S(1).subs{carr.broken} = (idx_data:idx_data+last-first);
+                        
+                        expr_ind = subs2str(S(1).subs);
+                        value = eval(['carr.data' expr_ind  ';']);
+                    end
+                otherwise % property assignment
+                    value = builtin('subsref', carr, S);                    
             end
         end
         
@@ -193,6 +283,27 @@ classdef CachedArray < handle
         end
         
     end 
+end
+
+function I = subs2str(subs)
+I = '(';
+for i = 1:length(subs)
+    if strcmp(subs{1,i},':')
+        I = strcat(I, ':,');
+    else
+        if length(subs{i}) > 1
+            first = subs{i}(1);
+            last = subs{i}( length(subs{i}) );
+            I = strcat(I, [num2str(first) ':' num2str(last) ',']);
+        else
+            I = strcat(I, [num2str(subs{i}) ',']);
+        end
+        %for j = 1:length(subs{i})
+        %    I = strcat(I, [num2str(subs{i}(j)) ',']);
+        %end
+    end
+end
+I(end) = ')';
 end
 
 % Converts array of indices of form [0 1 5 0] into string '(:,1:5,:)' for
