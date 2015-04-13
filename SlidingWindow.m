@@ -80,7 +80,6 @@ methods
         sw.volume = vol;
         sw.coordinate = coord;
         sw.data = zeros(vol, type);
-        %sw.flush = 0;
         sw.ibroken = broken;
         sw.type = type;
         sw.dimension = dim;
@@ -127,6 +126,9 @@ methods
     function assign(sw, limits, chunk)
         expr = subs2str(limits);
         eval(['sw.data' expr '=chunk;']);
+        if (limits{sw.ibroken}(end) == sw.dimension(sw.ibroken)) % automatically flush if it's the very last chunk
+            sw.flush();
+        end
     end
     
     function loc = glo2loc(sw, glo) % global to local indexing
@@ -142,18 +144,13 @@ methods
     function move(sw, limits) % change coords only for broken dimension
         b = sw.ibroken;
         sw.coordinate(b) = limits{b}(1);
-        %if (limits{b}(1) + sw.volume(b) - 1 <= sw.dimension(b))
-        %else
-            % end chunk - dont flush completely
-            %offset =  limits{b}(end) - sw.volume(b);
-            %data_shifted = circshift(sw.data, offset, b);
-            %sw.flush();
-        %end
     end
     
     function flush(sw)
-        disp(sw.data); 
+        %disp(sw.data); 
         % + save data to file (the end chunk could contain data that is not needed to be saved!)
+        
+        sw.coordinate = sw.coordinate * 0 + 1;
         sw.data = sw.data*0;
     end
         

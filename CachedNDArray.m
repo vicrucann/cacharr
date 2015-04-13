@@ -9,7 +9,6 @@ classdef CachedNDArray
     %   2015 victoria.rudakova(at)yale.edu
     
     properties (GetAccess = 'public', SetAccess = 'private')
-        %flush; 
         window; % class SlidingWindow
         dimension;
         type;
@@ -33,6 +32,24 @@ classdef CachedNDArray
             vol(broken) = ceil(dims(broken) / nchunks);
             coord = ones(size(dims));
             cnda.window = SlidingWindow(coord, vol, broken, type, dims);
+            
+            % if no caching - do nothing, otherwise:
+            fprintf('Cached N-d Array is being initialized: ');
+            %nchunk = getnchunk(dims(broken), vol(broken));
+            for i = 1:nchunk % for each chunk
+                fname = [var_name '_' num2str(i) '.dat'];
+                fid = fopen([path_cache fname], 'Wb');
+                if (i < nchunk)
+                    fwrite(fid, cnda.window.data, type);
+                else % * last chunk could be smaller in size
+                    volc = vol;
+                    volc(broken) = dims(broken) - (nchunk-1) * vol(broken);
+                    fwrite(fid, zeros(volc, type), type);
+                end
+                fclose(fid);
+                progress_bar(i, nchunk);
+            end
+            fprintf('\n');
         end
         
         function cnda = subsasgn(cnda, S, chunk)
@@ -61,5 +78,9 @@ classdef CachedNDArray
         end
     end
     
+end
+
+function nchunk = getnchunk(vol, dim)
+nchunk = floor(dim / vol);
 end
 
