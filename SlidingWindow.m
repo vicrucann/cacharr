@@ -69,13 +69,13 @@ properties (GetAccess = 'public', SetAccess = 'private')
     volume;
     coordinate;
     data; 
-    %flush;
     ibroken;
     type;
+    dimension;
 end
 
 methods
-    function sw = SlidingWindow(coord, vol, broken, type)
+    function sw = SlidingWindow(coord, vol, broken, type, dim)
         assert(sum(size(vol) == size(coord)) ~= 0, 'Dimension number mismatch.');
         sw.volume = vol;
         sw.coordinate = coord;
@@ -83,10 +83,21 @@ methods
         %sw.flush = 0;
         sw.ibroken = broken;
         sw.type = type;
+        sw.dimension = dim;
     end
     
     function write(sw, limits, chunk)
+        for i = 1 : size(limits,2)
+            if (strcmp(limits(i), ':'))
+                continue;
+            end
+            assert(limits{i}(end) <= sw.dimension(i), 'Assignment operator: out of range NDArray');
+        end
         b = sw.ibroken;
+        assert(sum(size(chunk) > cnda.window.volume) == 0,...
+            'Requested range is too large for the current CachedNDArray setup');
+        assert(size(chunk,b) <= cnda.window.volume(b), ...
+            'Requested range`s broken dimension is wider than the sliding window');
         lb = limits{b}; % limits of broken dimension
         vol = sw.volume(b);
         assert(strcmp(lb, ':') == 0 && sum(lb(end)-lb(1) > vol) == 0, ...
@@ -94,8 +105,9 @@ methods
         co = sw.coordinate(b);
         range = getrange(co, vol); % volume range
         if (lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just assign; otherwise:
-            sw.flush(); % save data to disk if any + initialize data to zeros
-            sw.move(limits); % re-assignment of coordinate variable
+            % move sliding window (save all the previous data, prepare data variable)
+            sw.flush();
+            sw.move(limits); % + re-assignment of coordinate variable
         end
         limits{b} = sw.glo2loc(lb); % global to local indexing
         sw.assign(limits, chunk); % assign chunk to corresponding data range
@@ -123,19 +135,25 @@ methods
         co = sw.coordinate(b);
         range = getrange(co, vol);
         assert(glo(1) >= range(1) && glo(end) <= range(end),...
-            'Conversion is not possible: broken indices are out of sliding window range');
+            'Conversion is not possible: indices are out of sliding window range');
         loc = glo - co + 1;
     end
     
     function move(sw, limits) % change coords only for broken dimension
         b = sw.ibroken;
-        coord = limits{b};
-        sw.coordinate(b) = coord(1);        
+        sw.coordinate(b) = limits{b}(1);
+        %if (limits{b}(1) + sw.volume(b) - 1 <= sw.dimension(b))
+        %else
+            % end chunk - dont flush completely
+            %offset =  limits{b}(end) - sw.volume(b);
+            %data_shifted = circshift(sw.data, offset, b);
+            %sw.flush();
+        %end
     end
     
     function flush(sw)
         disp(sw.data); 
-        % + save data to file
+        % + save data to file (the end chunk could contain data that is not needed to be saved!)
         sw.data = sw.data*0;
     end
         

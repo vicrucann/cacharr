@@ -32,20 +32,11 @@ classdef CachedNDArray
             vol = dims;
             vol(broken) = ceil(dims(broken) / nchunks);
             coord = ones(size(dims));
-            cnda.window = SlidingWindow(coord, vol, broken, type);
+            cnda.window = SlidingWindow(coord, vol, broken, type, dims);
         end
         
         function cnda = subsasgn(cnda, S, chunk)
-            b = cnda.ibroken;
-            assert(sum(size(chunk) > cnda.window.volume) == 0, 'Requested range is too large for the current CachedNDArray setup');
-            assert(size(chunk,b) <= cnda.window.volume(b), 'Requested range`s broken dimension is wider than the sliding data window');
             if (strcmp(S(1).type, '()') ) 
-                for i = 1 : size(S.subs,2)
-                    if (strcmp(S.subs(i), ':'))
-                        continue;
-                    end
-                    assert(S.subs{i}(end) <= cnda.dimension(i), 'Assignment operator: out of range NDArray');
-                end
                 % and caching == 1
                 cnda.window.write(S(1).subs, chunk);
                 
