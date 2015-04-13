@@ -36,18 +36,17 @@ classdef CachedNDArray
             % if no caching - do nothing, otherwise:
             fprintf('Cached N-d Array is being initialized: ');
             %nchunk = getnchunk(dims(broken), vol(broken));
-            for i = 1:nchunk % for each chunk
+            for i = 1:nchunks % for each chunk
                 fname = [var_name '_' num2str(i) '.dat'];
                 fid = fopen([path_cache fname], 'Wb');
-                if (i < nchunk)
+                if (i < nchunks)
                     fwrite(fid, cnda.window.data, type);
                 else % * last chunk could be smaller in size
-                    volc = vol;
-                    volc(broken) = dims(broken) - (nchunk-1) * vol(broken);
-                    fwrite(fid, zeros(volc, type), type);
+                    vol(broken) = dims(broken) - (nchunks-1) * vol(broken);
+                    fwrite(fid, zeros(vol, type), type);
                 end
                 fclose(fid);
-                progress_bar(i, nchunk);
+                progress_bar(i, nchunks);
             end
             fprintf('\n');
         end
