@@ -72,6 +72,7 @@ properties (GetAccess = 'public', SetAccess = 'private')
     ibroken;
     type;
     dimension;
+    fsaved = 1;
 end
 
 methods
@@ -93,9 +94,9 @@ methods
             assert(limits{i}(end) <= sw.dimension(i), 'Assignment operator: out of range NDArray');
         end
         b = sw.ibroken;
-        assert(sum(size(chunk) > cnda.window.volume) == 0,...
+        assert(sum(size(chunk) > sw.volume) == 0,...
             'Requested range is too large for the current CachedNDArray setup');
-        assert(size(chunk,b) <= cnda.window.volume(b), ...
+        assert(size(chunk,b) <= sw.volume(b), ...
             'Requested range`s broken dimension is wider than the sliding window');
         lb = limits{b}; % limits of broken dimension
         vol = sw.volume(b);
@@ -126,7 +127,9 @@ methods
     function assign(sw, limits, chunk)
         expr = subs2str(limits);
         eval(['sw.data' expr '=chunk;']);
-        if (limits{sw.ibroken}(end) == sw.dimension(sw.ibroken)) % automatically flush if it's the very last chunk
+        sw.fsaved = 0;
+        lim_glo = sw.loc2glo(limits{sw.ibroken}(end)); % back from local to global
+        if (lim_glo == sw.dimension(sw.ibroken)) % automatically flush if it's the very last chunk
             sw.flush();
         end
     end
@@ -141,17 +144,30 @@ methods
         loc = glo - co + 1;
     end
     
+    function glo = loc2glo(sw, loc)
+        b = sw.ibroken;
+        vol = sw.volume(b);
+        co = sw.coordinate(b);
+        assert(loc(1) >= 1 && loc(end) <= vol,...
+            'Conversion is not possible: indices are out of sliding window range');
+        glo = loc + co - 1;
+    end
+    
     function move(sw, limits) % change coords only for broken dimension
         b = sw.ibroken;
         sw.coordinate(b) = limits{b}(1);
     end
     
     function flush(sw)
-        %disp(sw.data); 
-        % + save data to file (the end chunk could contain data that is not needed to be saved!)
+        if (~sw.fsaved)
+            %disp(sw.data);
+            % + save data to file (the end chunk could contain data that is not needed to be saved!)
+            
+            sw.coordinate = sw.coordinate * 0 + 1;
+            sw.data = sw.data*0;
+            sw.fsaved = 1;
+        end
         
-        sw.coordinate = sw.coordinate * 0 + 1;
-        sw.data = sw.data*0;
     end
         
 end
