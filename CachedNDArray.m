@@ -31,14 +31,14 @@ classdef CachedNDArray
             vol = dims;
             vol(broken) = ceil(dims(broken) / nchunks);
             coord = ones(size(dims));
-            cnda.window = SlidingWindow(coord, vol, broken, type, dims);
+            cnda.window = SlidingWindow(coord, vol, broken, type, dims, path_cache, var_name);
             
             % if no caching - do nothing, otherwise:
             fprintf('Cached N-d Array is being initialized: ');
             %nchunk = getnchunk(dims(broken), vol(broken));
             for i = 1:nchunks % for each chunk
-                fname = [var_name '_' num2str(i) '.dat'];
-                fid = fopen([path_cache fname], 'Wb');
+                fname = get_fname(path_cache, var_name, i);
+                fid = fopen(fname, 'Wb');
                 if (i < nchunks)
                     fwrite(fid, cnda.window.data, type);
                 else % * last chunk could be smaller in size

@@ -73,10 +73,12 @@ properties (GetAccess = 'public', SetAccess = 'private')
     type;
     dimension;
     fsaved = 1;
+    cpath = 'cache';
+    vname = 'tmp';
 end
 
 methods
-    function sw = SlidingWindow(coord, vol, broken, type, dim)
+    function sw = SlidingWindow(coord, vol, broken, type, dim, cpath, vname)
         assert(sum(size(vol) == size(coord)) ~= 0, 'Dimension number mismatch.');
         sw.volume = vol;
         sw.coordinate = coord;
@@ -84,6 +86,8 @@ methods
         sw.ibroken = broken;
         sw.type = type;
         sw.dimension = dim;
+        sw.cpath = cpath;
+        sw.vname = vname;
     end
     
     function write(sw, limits, chunk)
@@ -160,9 +164,46 @@ methods
     
     function flush(sw)
         if (~sw.fsaved)
-            %disp(sw.data);
-            % + save data to file (the end chunk could contain data that is not needed to be saved!)
+            % extract the indices to assign the data to memory file
+            % assign to the memory
+            % the end chunk could contain data that is not needed to be saved!
+            b = sw.ibroken;
+            vol = sw.volume(b);
+            co = sw.coordinate(b);
+            sz = size(sw.volume,2);
+            fidx = getidxchunk(co, vol);
+            lidx = getidxchunk(co+vol-1, vol);
+            assert(fidx <= lidx, 'Indexing calculation failed');
+            nfiles = (fidx ~= lidx) + 1;
+            assert(nfiles <= 2, 'Number of files to open: calculation failed');
             
+            offset = getidxb(co, vol);
+            fname = get_fname(sw.cpath, sw.vname, fidx);
+            m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
+            subs11 = gensubs(sz);
+            subs11{b} = [num2str(offset) ':' num2str(vol)];
+            expr11 = subs2str(subs11);
+            subs12 = gensubs(sz);
+            subs12{b} = ['1:' num2str(vol-offset+1)];
+            expr12 = subs2str(subs12);
+            eval(['m.Data' expr11 '=sw.data' expr12 ';']);
+                        
+            %subs21 = gensubs(size(vol,2));
+            %subs22 = gensubs(size(vol,2));
+            
+            if (nfiles == 1) % if it's only 1 file to open
+            else % if there are two files to open
+                fname = get_fname(sw.cpath, sw.vname, lidx);
+                m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
+            end
+            
+            for i = fidx:lidx
+                offset = getidxb(co, vol);
+                
+                m.Data(offset:end, :) = sw.data(1:vol-offset, :); % 1st file
+                m.Data(1:offset, :) = sw.data(vol-offset+1:end, :); % 2nd file
+            end
+            % mark the properties flushed
             sw.coordinate = sw.coordinate * 0 + 1;
             sw.data = sw.data*0;
             sw.fsaved = 1;
@@ -178,12 +219,23 @@ function r = getrange(coord, vol)
 r = [coord, coord + vol - 1];
 end
 
-% function idxb = getidxb(co, vol)
-% idxb = mod(co, vol);
-% if (idxb == 0)
-%     idxb = vol;
-% end
-% end
+function idxc = getidxchunk(co, vol)
+idxc = ceil(co / vol);
+end
+
+function idxb = getidxb(co, vol)
+idxb = mod(co, vol);
+if (idxb == 0)
+    idxb = vol;
+end
+end
+
+function subs = gensubs(sz)
+subs = cell(1,sz);
+for i = 1 : sz
+    subs{i} = ':';
+end
+end
 
 function I = subs2str(subs)
 I = '(';
@@ -191,12 +243,11 @@ for i = 1:length(subs)
     if strcmp(subs{1,i},':')
         I = strcat(I, ':,');
     else
-        if length(subs{i}) > 1
-            first = subs{i}(1);
-            last = subs{i}( length(subs{i}) );
-            I = strcat(I, [num2str(first) ':' num2str(last) ',']);
+        str = sscanf(subs{i}, '%f:%f');
+        if length(str) > 1
+            I = strcat(I, [num2str(str(1)) ':' num2str(str(2)) ',']);
         else
-            I = strcat(I, [num2str(subs{i}) ',']);
+            I = strcat(I, [num2str(str(1)) ',']);
         end
     end
 end
