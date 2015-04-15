@@ -97,9 +97,11 @@ methods
             end
             assert(limits{i}(end) <= sw.dimension(i), 'Assignment operator: out of range NDArray');
         end
+        for i = 1 : length(size(chunk))
+            assert(size(chunk,i) <= sw.volume(i), ...
+                'Requested range is too large for the current CachedNDArray setup');
+        end
         b = sw.ibroken;
-        assert(sum(size(chunk) > sw.volume) == 0,...
-            'Requested range is too large for the current CachedNDArray setup');
         assert(size(chunk,b) <= sw.volume(b), ...
             'Requested range`s broken dimension is wider than the sliding window');
         lb = limits{b}; % limits of broken dimension
@@ -180,16 +182,16 @@ methods
             offset = getidxb(co, vol);
             fname = get_fname(sw.cpath, sw.vname, fidx);
             m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-            subs11 = gensubs(sz);
-            subs11{b} = [num2str(offset) ':' num2str(vol)];
-            expr11 = subs2str(subs11);
+            m_first = ones(1,sz); % [:,offset:vol,:]
+            m_last = m_first .* sw.volume;
+            m_first(b) = offset;
+            m_first = get_memmapidx(m_first, sw.volume);
+            m_last = get_memmapidx(m_last, sw.volume);
             subs12 = gensubs(sz);
-            subs12{b} = ['1:' num2str(vol-offset+1)];
+            subs12{b} = (1:vol-offset+1);
             expr12 = subs2str(subs12);
-            eval(['m.Data' expr11 '=sw.data' expr12 ';']);
-                        
-            %subs21 = gensubs(size(vol,2));
-            %subs22 = gensubs(size(vol,2));
+            chunk = eval(['sw.data' expr12 ';']);
+            m.Data(m_first:m_last) = chunk;
             
             if (nfiles == 1) % if it's only 1 file to open
             else % if there are two files to open
@@ -243,11 +245,12 @@ for i = 1:length(subs)
     if strcmp(subs{1,i},':')
         I = strcat(I, ':,');
     else
-        str = sscanf(subs{i}, '%f:%f');
-        if length(str) > 1
-            I = strcat(I, [num2str(str(1)) ':' num2str(str(2)) ',']);
+        if length(subs{i}) > 1
+            first = subs{i}(1);
+            last = subs{i}( length(subs{i}) );
+            I = strcat(I, [num2str(first) ':' num2str(last) ',']);
         else
-            I = strcat(I, [num2str(str(1)) ',']);
+            I = strcat(I, [num2str(subs{i}) ',']);
         end
     end
 end
