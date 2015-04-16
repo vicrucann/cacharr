@@ -150,29 +150,10 @@ methods
         sw.fsaved = 0;
     end
     
-    function chunk = gather(sw, limits) % from sw.data to chunk
-        b = sw.ibroken;
-        vol = sw.volume(b);
-        fidx = getidxchunk(limits{b}(1), vol);
-        lidx = getidxchunk(limits{b}(end), vol);
-        nchunks = get_nchunks(vol, sw.dimension(b));
-        if (lidx > nchunks) % the end chunk could contain data that is not needed to be saved!
-            lidx = nchunks; % so we trim it
-        end
-        assert(fidx <= lidx, 'Indexing calculation failed');
-        nfiles = (fidx ~= lidx) + 1;
-        assert(nfiles <= 2, 'Number of files to open: calculation failed');
-        offset = getidxb(co, vol);
-        fname = get_fname(sw.cpath, sw.vname, fidx);
-            
-        
-        sw.rmemmap(fname);
+    function chunk = gather(sw, limits) % from sw.data to chunk (opposite to assign), limits are in local scale
+        sw.draw(); % transfer from file to sw.data
         expr = subs2str(limits);
-        
-        m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-        %chunk = reshape(m.Data, sw.volume);
-        
-        chunk = eval(['sw.data' expr ';']);
+        chunk = eval(['sw.data' expr]); % copy from sw.data to chunk
     end
     
     function loc = glo2loc(sw, glo) % global to local indexing
@@ -199,8 +180,26 @@ methods
         sw.coordinate(b) = limits{b}(1);
     end
     
-    function draw(sw) % from file(-s) to sw.data
-        
+    function draw(sw) % from file(-s) to sw.data (opposite to flush)
+        b = sw.ibroken;
+        vol = sw.volume(b);
+        co = sw.coordinate(b);
+        fidx = getidxchunk(co, vol);
+        lidx = getidxchunk(co+vol-1, vol);
+        nchunks = get_nchunks(vol, sw.dimension(b));
+        if (lidx > nchunks) % the end chunk could contain data that is not needed to be saved!
+            lidx = nchunks; % so we trim it
+        end
+        assert(fidx <= lidx, 'Indexing calculation failed');
+        nfiles = (fidx ~= lidx) + 1;
+        assert(nfiles <= 2, 'Number of files to open: calculation failed');
+        offset = getidxb(co, vol);
+        fname = get_fname(sw.cpath, sw.vname, fidx);
+        sw.rmemmap(fname, 1, vol-offset+1, offset, vol);
+        if (nfiles == 2)
+            fname = get_fname(sw.cpath, sw.vname, lidx);
+            sw.rmemmap(fname, vol-offset+2, vol, 1, offset-1);
+        end
     end
     
     function flush(sw) % from sw.data to files
