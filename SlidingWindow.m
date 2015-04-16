@@ -134,10 +134,10 @@ methods
         expr = subs2str(limits);
         eval(['sw.data' expr '=chunk;']);
         sw.fsaved = 0;
-        lim_glo = sw.loc2glo(limits{sw.ibroken}(end)); % back from local to global
-        if (lim_glo == sw.dimension(sw.ibroken)) % automatically flush if it's the very last chunk
-            sw.flush();
-        end
+        %lim_glo = sw.loc2glo(limits{sw.ibroken}(end)); % back from local to global
+        %if (lim_glo == sw.dimension(sw.ibroken)) % automatically flush if it's the very last chunk
+        %    sw.flush();
+        %end
     end
     
     function loc = glo2loc(sw, glo) % global to local indexing
@@ -166,51 +166,53 @@ methods
     
     function flush(sw)
         if (~sw.fsaved)
-            % extract the indices to assign the data to memory file
-            % assign to the memory
-            % the end chunk could contain data that is not needed to be saved!
             b = sw.ibroken;
             vol = sw.volume(b);
             co = sw.coordinate(b);
-            sz = size(sw.volume,2);
             fidx = getidxchunk(co, vol);
             lidx = getidxchunk(co+vol-1, vol);
+            nchunks = get_nchunks(vol, sw.dimension(b));
+            if (lidx > nchunks) % the end chunk could contain data that is not needed to be saved!
+                lidx = nchunks; % so we trim it
+            end
             assert(fidx <= lidx, 'Indexing calculation failed');
             nfiles = (fidx ~= lidx) + 1;
             assert(nfiles <= 2, 'Number of files to open: calculation failed');
-            
             offset = getidxb(co, vol);
             fname = get_fname(sw.cpath, sw.vname, fidx);
-            m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-            m_first = ones(1,sz); % [:,offset:vol,:]
-            m_last = m_first .* sw.volume;
-            m_first(b) = offset;
-            m_first = get_memmapidx(m_first, sw.volume);
-            m_last = get_memmapidx(m_last, sw.volume);
-            subs12 = gensubs(sz);
-            subs12{b} = (1:vol-offset+1);
-            expr12 = subs2str(subs12);
-            chunk = eval(['sw.data' expr12 ';']);
-            m.Data(m_first:m_last) = chunk;
-            
-            if (nfiles == 1) % if it's only 1 file to open
-            else % if there are two files to open
+            sw.wmemmap(fname, offset, vol, 1, vol-offset+1);
+            if (nfiles == 2)
                 fname = get_fname(sw.cpath, sw.vname, lidx);
-                m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-            end
-            
-            for i = fidx:lidx
-                offset = getidxb(co, vol);
-                
-                m.Data(offset:end, :) = sw.data(1:vol-offset, :); % 1st file
-                m.Data(1:offset, :) = sw.data(vol-offset+1:end, :); % 2nd file
+                sw.wmemmap(fname, 1, offset-1, vol-offset+2, vol);
             end
             % mark the properties flushed
             sw.coordinate = sw.coordinate * 0 + 1;
             sw.data = sw.data*0;
             sw.fsaved = 1;
         end
+    end
+    
+    function wmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % write to memmapfile
+        b = sw.ibroken;        
+        sz = size(sw.volume,2);
+        m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
+        chunk = reshape(m.Data, sw.volume);
         
+        %m_first = ones(1,sz);
+        %m_last = m_first .* sw.volume;
+        %m_first(b) = fidx;
+        %m_last(b) = lidx;
+        %m_first = get_memmapidx(m_first, sw.volume);        
+        %m_last = get_memmapidx(m_last, sw.volume);
+        subs_r = gensubs(sz);
+        subs_l = subs_r;
+        subs_r{b} = (ridx1:ridx2);
+        subs_l{b} = (lidx1:lidx2);
+        rhs = subs2str(subs_r);
+        lhs = subs2str(subs_l);        
+        %chunk = eval(['sw.data' expr ';']);
+        eval(['chunk' lhs '=' 'sw.data' rhs ';']);
+        m.Data = chunk;
     end
         
 end
