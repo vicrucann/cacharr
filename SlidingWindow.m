@@ -95,7 +95,8 @@ methods
             if (strcmp(limits(i), ':'))
                 continue;
             end
-            assert(limits{i}(end) <= sw.dimension(i), 'Assignment operator: out of range NDArray');
+            assert(limits{i}(end) <= sw.dimension(i) && limits{i}(1) >= 1, ...
+                'Assignment operator: out of range NDArray');
         end
         for i = 1 : length(size(chunk))
             assert(size(chunk,i) <= sw.volume(i), ...
@@ -119,25 +120,59 @@ methods
         sw.assign(limits, chunk); % assign chunk to corresponding data range
     end
     
-    function [ifile, nfid ] = get_ifile(sw, range)
-        vol = sw.volume(sw.ibroken);
-        fid1 = ceil(range(1) ./ vol);
-        c0 = 1+vol*(fid1-1);
-        offset = range(1)-c0;
-        cusion = vol - (range(end)-range(1));
-        nfid = (offset-cusion > 0) + 1;
-        assert(nfid <= 2 && offset < vol); % debugging
-        ifile = fid1; 
+    function chunk = read(sw, limits)
+        % make sure chunk limits are within global dimension
+        for i = 1:size(limits,2)
+            if (strcmp(limits(i), ':'))
+                continue;
+            end
+            assert(limits{i}(end) <= sw.dimension(i) && limits{i}(1) >= 1, ...
+                'Reference operator: out of range NDArray');
+        end
+        % make sure there is enough memory to create chunk of givin limits
+        b = sw.ibroken;
+        lb = limits{b};
+        vol = sw.volume(b);
+        co = sw.coordinate(b);
+        range = getrange(co, vol);
+        if (lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just read; otherwise:
+            % move sliding window (save all the previous data, prepare data variable)
+            sw.flush();
+            sw.move(limits); % + re-assignment of coordinate variable
+        end
+        limits{b} = sw.glo2loc(lb);
+        chunk = sw.gather(limits);
     end
     
-    function assign(sw, limits, chunk)
+    function assign(sw, limits, chunk) % from chunk to sw.data
         expr = subs2str(limits);
         eval(['sw.data' expr '=chunk;']);
         sw.fsaved = 0;
-        %lim_glo = sw.loc2glo(limits{sw.ibroken}(end)); % back from local to global
-        %if (lim_glo == sw.dimension(sw.ibroken)) % automatically flush if it's the very last chunk
-        %    sw.flush();
-        %end
+    end
+    
+    function chunk = gather(sw, limits) % from sw.data to chunk
+        b = sw.ibroken;
+        vol = sw.volume(b);
+        fidx = getidxchunk(limits{b}(1), vol);
+        lidx = getidxchunk(limits{b}(end), vol);
+        nchunks = get_nchunks(vol, sw.dimension(b));
+        if (lidx > nchunks) % the end chunk could contain data that is not needed to be saved!
+            lidx = nchunks; % so we trim it
+        end
+        assert(fidx <= lidx, 'Indexing calculation failed');
+        nfiles = (fidx ~= lidx) + 1;
+        assert(nfiles <= 2, 'Number of files to open: calculation failed');
+        offset = getidxb(co, vol);
+        fname = get_fname(sw.cpath, sw.vname, fidx);
+            
+        
+        sw.rmemmap(fname);
+        expr = subs2str(limits);
+        
+        m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
+        %chunk = reshape(m.Data, sw.volume);
+        
+        chunk = eval(['sw.data' expr ';']);
     end
     
     function loc = glo2loc(sw, glo) % global to local indexing
@@ -150,21 +185,25 @@ methods
         loc = glo - co + 1;
     end
     
-    function glo = loc2glo(sw, loc)
-        b = sw.ibroken;
-        vol = sw.volume(b);
-        co = sw.coordinate(b);
-        assert(loc(1) >= 1 && loc(end) <= vol,...
-            'Conversion is not possible: indices are out of sliding window range');
-        glo = loc + co - 1;
-    end
+%     function glo = loc2glo(sw, loc)
+%         b = sw.ibroken;
+%         vol = sw.volume(b);
+%         co = sw.coordinate(b);
+%         assert(loc(1) >= 1 && loc(end) <= vol,...
+%             'Conversion is not possible: indices are out of sliding window range');
+%         glo = loc + co - 1;
+%     end
     
     function move(sw, limits) % change coords only for broken dimension
         b = sw.ibroken;
         sw.coordinate(b) = limits{b}(1);
     end
     
-    function flush(sw)
+    function draw(sw) % from file(-s) to sw.data
+        
+    end
+    
+    function flush(sw) % from sw.data to files
         if (~sw.fsaved)
             b = sw.ibroken;
             vol = sw.volume(b);
@@ -192,29 +231,34 @@ methods
         end
     end
     
-    function wmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % write to memmapfile
+    function rmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % read from memmapfile to sw.data
         b = sw.ibroken;        
         sz = size(sw.volume,2);
         m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-        chunk = reshape(m.Data, sw.volume);
-        
-        %m_first = ones(1,sz);
-        %m_last = m_first .* sw.volume;
-        %m_first(b) = fidx;
-        %m_last(b) = lidx;
-        %m_first = get_memmapidx(m_first, sw.volume);        
-        %m_last = get_memmapidx(m_last, sw.volume);
+        chunk = reshape(m.Data, sw.volume); % read the data from file
         subs_r = gensubs(sz);
         subs_l = subs_r;
         subs_r{b} = (ridx1:ridx2);
         subs_l{b} = (lidx1:lidx2);
         rhs = subs2str(subs_r);
         lhs = subs2str(subs_l);        
-        %chunk = eval(['sw.data' expr ';']);
+        eval(['sw.data' lhs '=' 'chunk' rhs ';']);
+    end
+    
+    function wmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % write sw.data to memmapfile
+        b = sw.ibroken;        
+        sz = size(sw.volume,2);
+        m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
+        chunk = reshape(m.Data, sw.volume); % read the data which is already in file
+        subs_r = gensubs(sz);
+        subs_l = subs_r;
+        subs_r{b} = (ridx1:ridx2);
+        subs_l{b} = (lidx1:lidx2);
+        rhs = subs2str(subs_r);
+        lhs = subs2str(subs_l);        
         eval(['chunk' lhs '=' 'sw.data' rhs ';']);
         m.Data = chunk;
     end
-        
 end
 
 end

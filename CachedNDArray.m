@@ -65,7 +65,11 @@ classdef CachedNDArray
         
         function chunk = subsref(cnda, S)
             if (strcmp(S(1).type, '()') )
+                % and caching == 1
+                chunk = cnda.window.read(S(1).subs);
                 
+                %chunk = builtin('subsref', cnda.window.data, S); for
+                %caching = 0;
             else
                 chunk = builtin('subsref', cnda, S);
             end
