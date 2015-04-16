@@ -79,7 +79,3 @@ classdef CachedNDArray
     
 end
 
-function nchunk = getnchunk(vol, dim)
-nchunk = floor(dim / vol);
-end
-
