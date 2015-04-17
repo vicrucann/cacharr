@@ -129,7 +129,7 @@ methods
             assert(limits{i}(end) <= sw.dimension(i) && limits{i}(1) >= 1, ...
                 'Reference operator: out of range NDArray');
         end
-        % make sure there is enough memory to create chunk of givin limits
+        % make sure there is enough memory to create chunk of given limits
         b = sw.ibroken;
         lb = limits{b};
         vol = sw.volume(b);
@@ -165,15 +165,6 @@ methods
             'Conversion is not possible: indices are out of sliding window range');
         loc = glo - co + 1;
     end
-    
-%     function glo = loc2glo(sw, loc)
-%         b = sw.ibroken;
-%         vol = sw.volume(b);
-%         co = sw.coordinate(b);
-%         assert(loc(1) >= 1 && loc(end) <= vol,...
-%             'Conversion is not possible: indices are out of sliding window range');
-%         glo = loc + co - 1;
-%     end
     
     function move(sw, limits) % change coords only for broken dimension
         b = sw.ibroken;

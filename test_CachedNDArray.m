@@ -17,6 +17,6 @@ for i = 1:dims(1)-1
 end
 cnda.flush();
 
-for j = 1:3:dims(1)-3
-    line3 = cnda(j:j+3,:,:);
+for j = 1:2:dims(1)-3
+    line3 = cnda(j:j+2,:,:);
 end
