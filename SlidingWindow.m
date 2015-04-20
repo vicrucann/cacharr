@@ -65,7 +65,7 @@ classdef SlidingWindow < handle
     
     %   2015 victoria.rudakova(at)yale.edu
     
-properties %(GetAccess = 'public', SetAccess = 'private')
+properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
     volume;
     coordinate;
     data; 
