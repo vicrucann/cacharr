@@ -105,23 +105,14 @@ methods
     end
     
     function chunk = read(sw, limits)
-        % make sure chunk limits are within global dimension
-        for i = 1:size(limits,2)
-            if (strcmp(limits(i), ':'))
-                continue;
-            end
-            assert(limits{i}(end) <= sw.dimension(i) && limits{i}(1) >= 1, ...
-                'Reference operator: out of range NDArray');
-        end
-        % make sure there is enough memory to create chunk of given limits
+        % TO DO: make sure there is enough memory to create chunk of given limits
         b = sw.ibroken;
         lb = limits{b};
         vol = sw.volume(b);
         co = sw.coordinate(b);
         range = getrange(co, vol);
         if (lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just read; otherwise:
-            % move sliding window (save all the previous data, prepare data variable)
-            sw.flush();
+            sw.flush(); % move sliding window (save all the previous data, prepare data variable)
             sw.move(limits); % + re-assignment of coordinate variable
         end
         limits{b} = sw.glo2loc(lb);

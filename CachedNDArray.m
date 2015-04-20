@@ -127,6 +127,15 @@ classdef CachedNDArray
         function chunk = subsref(cnda, S)
             if (strcmp(S(1).type, '()') )
                 if (cnda.cached)
+                    limits = S(1).subs;
+                    % make sure chunk limits are within global dimension
+                    for i = 1:size(limits,2)
+                        if (strcmp(limits(i), ':'))
+                            continue;
+                        end
+                        assert(limits{i}(end) <= cnda.window.dimension(i) && limits{i}(1) >= 1, ...
+                            'Reference operator: out of range NDArray');
+                    end
                     chunk = cnda.window.read(S(1).subs);
                 else
                     chunk = builtin('subsref', cnda.window.data, S);
