@@ -65,7 +65,7 @@ classdef SlidingWindow < handle
     
     %   2015 victoria.rudakova(at)yale.edu
     
-properties (GetAccess = 'public', SetAccess = 'private')
+properties %(GetAccess = 'public', SetAccess = 'private')
     volume;
     coordinate;
     data; 
@@ -91,29 +91,13 @@ methods
     end
     
     function write(sw, limits, chunk)
-        for i = 1 : size(limits,2)
-            if (strcmp(limits(i), ':'))
-                continue;
-            end
-            assert(limits{i}(end) <= sw.dimension(i) && limits{i}(1) >= 1, ...
-                'Assignment operator: out of range NDArray');
-        end
-        for i = 1 : length(size(chunk))
-            assert(size(chunk,i) <= sw.volume(i), ...
-                'Requested range is too large for the current CachedNDArray setup');
-        end
         b = sw.ibroken;
-        assert(size(chunk,b) <= sw.volume(b), ...
-            'Requested range`s broken dimension is wider than the sliding window');
         lb = limits{b}; % limits of broken dimension
         vol = sw.volume(b);
-        assert(strcmp(lb, ':') == 0 && sum(lb(end)-lb(1) > vol) == 0, ...
-            'Assignment range is wider than the sliding data window');
         co = sw.coordinate(b);
         range = getrange(co, vol); % volume range
         if (lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just assign; otherwise:
-            % move sliding window (save all the previous data, prepare data variable)
-            sw.flush();
+            sw.flush(); % move sliding window (save all the previous data, prepare data variable)
             sw.move(limits); % + re-assignment of coordinate variable
         end
         limits{b} = sw.glo2loc(lb); % global to local indexing

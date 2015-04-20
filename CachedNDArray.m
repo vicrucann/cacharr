@@ -16,12 +16,7 @@ classdef CachedNDArray
     
     properties (GetAccess = 'public', SetAccess = 'private')
         window; % class SlidingWindow
-        cached; % flag for caching or not (normal array) 
-        %dimension;
-        %type;
-        %ibroken;
-        %vname;
-        %cpath;
+        cached; % flag for caching or not (normal array)
     end
     
     methods
@@ -48,7 +43,7 @@ classdef CachedNDArray
                 'Dimensions must be positive integers');
             assert(broken <= size(dims,2),... 
                 'Index of broken dimension must be within dimension size');
-            assert(sum(idx_broken > length(dims)) == 0, ...
+            assert(sum(broken > length(dims)) == 0, ...
                 'One (or more) index of broken dimensions is larger than total number of dimensions');
             
             reqmem = whos(dims, type);
@@ -61,8 +56,11 @@ classdef CachedNDArray
                 cnda.cached = 1;
             end
             
+            cnda.cached = 1; % for testing, remove in release
+            
             if (~cnda.cached)
-                cnda.window.data = zeros(dims, type);
+                cnda.window = SlidingWindow(ones(size(dims)), dims, 0, type, dims, [], []);
+                %cnda.window.data = zeros(dims, type);
             else
                 if (sum(nchunks) == 0) % need to divide memory into number of chunks
                     gb = 8; % assume each chunk will be no more than 8 gb
@@ -92,21 +90,35 @@ classdef CachedNDArray
                 end
                 fprintf('\n');
             end
-            
-            %cnda.dimension = dims;
-            %cnda.ibroken = broken;
-            %cnda.type = type;
-            %cnda.vname = var_name;
-            %cnda.cpath = path_cache;
         end
         
         function cnda = subsasgn(cnda, S, chunk)
-            if (strcmp(S(1).type, '()') ) 
-                % and caching == 1
-                cnda.window.write(S(1).subs, chunk);
-                
-                %cnda = builtin('subsasgn', cnda.window.data, S, chunk); for
-                %caching = 0;
+            if (strcmp(S(1).type, '()') )
+                if (cnda.cached)
+                    limits = S(1).subs;
+                    
+                    for i = 1 : size(limits,2)
+                        if (strcmp(limits(i), ':'))
+                            continue;
+                        end
+                        assert(limits{i}(end) <= cnda.window.dimension(i) && limits{i}(1) >= 1, ...
+                            'Assignment operator: out of range NDArray');
+                    end
+                    for i = 1 : length(size(chunk))
+                        assert(size(chunk,i) <= cnda.window.volume(i), ...
+                            'Requested range is too large for the current CachedNDArray setup');
+                    end
+                    b = cnda.window.ibroken;
+                    assert(size(chunk,b) <= cnda.window.volume(b), ...
+                        'Requested range`s broken dimension is wider than the sliding window');
+                    lb = limits{b};
+                    assert(strcmp(lb, ':') == 0 && sum(lb(end)-lb(1) > cnda.window.volume(b)) == 0, ...
+                        'Assignment range is wider than the sliding data window');
+                    
+                    cnda.window.write(limits, chunk);
+                else
+                    cnda.window.data = builtin('subsasgn', cnda.window.data, S, chunk);
+                end
             else
                 cnda = builtin('subsasgn', cnda, S, chunk);
             end
@@ -114,11 +126,11 @@ classdef CachedNDArray
         
         function chunk = subsref(cnda, S)
             if (strcmp(S(1).type, '()') )
-                % and caching == 1
-                chunk = cnda.window.read(S(1).subs);
-                
-                %chunk = builtin('subsref', cnda.window.data, S); for
-                %caching = 0;
+                if (cnda.cached)
+                    chunk = cnda.window.read(S(1).subs);
+                else
+                    chunk = builtin('subsref', cnda.window.data, S);
+                end
             else
                 chunk = builtin('subsref', cnda, S);
             end
