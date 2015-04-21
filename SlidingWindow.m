@@ -1,83 +1,26 @@
 classdef SlidingWindow < handle
     %SlidingWindow class to work with CachedNDArray, represents a moving
-    %chunk chunk of data along the CachedNDArray
+    %chunk of data along the CachedNDArray
     
-    % Class properties:
-    % Volume = [v1 v2 ...]; // size of the sliding chunk
-    % Coords = [c1 c2 ...]; // sliding chunk location in global coordinates
-    % Flush = true / false; // date needs to be flushed or not
-    % Data = [x11 x12 ...; x21 x22 ...]; // data container
-    % IFile = [if1 coord11 coord12 ...; if2 coord21 coord22 ... ]^T; //
-    % indices of datafiles and corresponding local coords of data elements
-    % 
-    
-    % Initialization:
-    % Given chunk size and global dimensions, fopen and fwrite the cached
-    % files with zeros. It is necessary so that when re-writing, we could
-    % use memmapfile functionality which is faster than fwrite.
-    
-    % Two main functions:
-    % WRITE: X() = blob; - assignment
-    % READ: blob = X(); - reference
-    
-    % WRITE algorithm
-    % X() = blob;
-    % 0. If there is anything to be flushed, flush it onto disk
-    %    - If that's the case set flush=false afterwards
-    % 1. Check size(blob) <= size(slidind_chunk.dimension)
-    % 2. Find file indices for each element of blob in broken dimension
-    % 3. If all indices are the same as current index (idx_chunk), OR if
-    % sliding blob coordinates contain the requested blob:
-    %    - Save blob to data variable
-    %    - Mark flush as true (needed to be flushed)
-    % 3. If previous statement is false:
-    %    - If flush=true, flush data to disc, set flush=false
-    %    - Move sliding chunk coordinates so that it contains the requested
-    %    chunk
-    %    - Save blob to data variable -| Same code as in true statement
-    %    - Mark flush as true         -| (first part of point 3)
-    
-    % READ algorithm
-    % blob = X();
-    % 0. If there is anything to be flushed, flush it onto disk
-    %    - If that's the case set flush=false afterwards
-    % 1. Check size(blob) <= size(slidind_chunk.dimension)
-    % 2. Find file indices for each element of blob in broken dimension
-    % 3. If all indices are the same as current index (idx_chunk), OR if
-    % sliding blob coordinates contain the requested blob:
-    %    - Read to blob from data variable
-    % 3. If previous statement is false:
-    %    - If flush=true, flush data to disc, set flush=false
-    %    - Move sliding chunk coordinates so that it contains the requested
-    %    chunk
-    %    - Read to blob from data variable -| Same code as in true statement
-    
-    % FLUSH function
-    % flush = false -> no flush needed to be done
-    % flush = true -> there is temporary data, needed to be flushed
-    % files variable - contains the filenames with variables
-    % 1. For each file in the sliding chunk:
-    %    - Open file
-    %    - Make sure it is initialized (otherwise, initialize it with zeros)
-    %    - Assign the sliding chunk (or its part) to the designated memory 
-    %    area of the current file
-    % 2. Set flush = false
-    
+    % The class is only accessible by CachedNDArray class and its
+    % functions, and therefore is meant to be called only from
+    % CachedNDArray functions.
     %   2015 victoria.rudakova(at)yale.edu
     
 properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
-    volume;
-    coordinate;
-    data; 
-    ibroken;
-    type;
-    dimension;
-    fsaved = 1;
+    volume; % size of the sliding chunk
+    coordinate; % sliding chunk location in global coordinates
+    data; % data container (of size volume)
+    ibroken; % indices of broken dimensions, only 1 dimension is supported in this version
+    type; % data type, in string format
+    dimension; % overall dimension of CachedNDArray
+    fsaved = 1; % flag inficating of data needs to be saved
     cpath = 'cache';
     vname = 'tmp';
 end
 
 methods
+    % A window constructor, called by CachedNDArray constructor
     function sw = SlidingWindow(coord, vol, broken, type, dim, cpath, vname)
         assert(sum(size(vol) == size(coord)) ~= 0, 'Dimension number mismatch.');
         sw.volume = vol;
@@ -90,6 +33,8 @@ methods
         sw.vname = vname;
     end
     
+    % Called by CachedNDArray.subsasgn() to assign chunk variable to the
+    % memory
     function write(sw, limits, chunk)
         b = sw.ibroken;
         lb = limits{b}; % limits of broken dimension
@@ -104,6 +49,8 @@ methods
         sw.assign(limits, chunk); % assign chunk to corresponding data range
     end
     
+    % Called by CachedNDArray.subsref() to read from the memory to a chunk
+    % variable
     function chunk = read(sw, limits)
         % TO DO: make sure there is enough memory to create chunk of given limits
         b = sw.ibroken;
@@ -119,19 +66,22 @@ methods
         chunk = sw.gather(limits);
     end
     
-    function assign(sw, limits, chunk) % from chunk to sw.data
+    % Called from write(): moves chunk -> sw.data
+    function assign(sw, limits, chunk)
         expr = subs2str(limits);
         eval(['sw.data' expr '=chunk;']);
         sw.fsaved = 0;
     end
     
-    function chunk = gather(sw, limits) % from sw.data to chunk (opposite to assign), limits are in local scale
+    % Called from read(): moves sw.data -> chunk
+    function chunk = gather(sw, limits) % limits are in local scale
         sw.draw(); % transfer from file to sw.data
         expr = subs2str(limits);
         chunk = eval(['sw.data' expr]); % copy from sw.data to chunk
     end
     
-    function loc = glo2loc(sw, glo) % global to local indexing
+    % Transformation of broken dimension from global [dimension] to local [volume] indexing
+    function loc = glo2loc(sw, glo)
         b = sw.ibroken;
         vol = sw.volume(b);
         co = sw.coordinate(b);
@@ -141,12 +91,15 @@ methods
         loc = glo - co + 1;
     end
     
-    function move(sw, limits) % change coords only for broken dimension
+    % Called from write() and read(): move the sliding box within the broken dimension
+    % to a new coordinate
+    function move(sw, limits)
         b = sw.ibroken;
         sw.coordinate(b) = limits{b}(1);
     end
     
-    function draw(sw) % from file(-s) to sw.data (opposite to flush)
+    % Called from gather(): transfer from file(-s) to sw.data
+    function draw(sw)
         b = sw.ibroken;
         vol = sw.volume(b);
         co = sw.coordinate(b);
@@ -168,6 +121,8 @@ methods
         end
     end
     
+    % Called from write(), read(), CachedNDArray.flush(): flushes sw.data
+    % to corresponding file(-s)
     function flush(sw) % from sw.data to files
         if (~sw.fsaved)
             b = sw.ibroken;
@@ -196,6 +151,7 @@ methods
         end
     end
     
+    % Called from draw(): function to read from memmapfile to sw.data
     function rmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % read from memmapfile to sw.data
         b = sw.ibroken;        
         sz = size(sw.volume,2);
@@ -210,6 +166,8 @@ methods
         eval(['sw.data' lhs '=' 'chunk' rhs ';']);
     end
     
+    % Called from flush(): function to write sw.data content to associated
+    % memmapfile
     function wmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % write sw.data to memmapfile
         b = sw.ibroken;        
         sz = size(sw.volume,2);
