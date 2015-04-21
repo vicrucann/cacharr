@@ -16,6 +16,8 @@ for i = 1:dims(1)-1
     cnda(i:i+1,:,2) = line2;
 end
 cnda.flush();
+linex = cnda(19:end, :, end); % check 'end' method
+cnda(19:end, :, :) = rand(2,10,2);
 
 for j = 1:2:dims(1)-3
     line3 = cnda(j:j+2,:,:)
