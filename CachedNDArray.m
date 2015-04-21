@@ -56,7 +56,7 @@ classdef CachedNDArray
                 cnda.cached = 1;
             end
             
-            cnda.cached = 1; % for testing, remove in release
+            %cnda.cached = 1; % for testing, remove in release
             
             if (~cnda.cached)
                 cnda.window = SlidingWindow(ones(size(dims)), dims, 0, type, dims, [], []);
@@ -143,6 +143,11 @@ classdef CachedNDArray
             else
                 chunk = builtin('subsref', cnda, S);
             end
+        end
+        
+        function r = end(cnda, ipos, nidx)
+            assert(nidx == length(cnda.window.dimension), 'Number of indices is not given correctly');
+            r = cnda.window.dimension(ipos);
         end
         
         function success = flush(cnda)
