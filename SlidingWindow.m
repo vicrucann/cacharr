@@ -15,8 +15,10 @@ properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
     type; % data type, in string format
     dimension; % overall dimension of CachedNDArray
     fsaved = 1; % flag inficating of data needs to be saved
+    fdrawn = 0; % flag indicating if data needs to be drawn from file(-s)
     cpath = 'cache';
     vname = 'tmp';
+    fast = 1; % fast(blockwise) or slow (sliding) window type
 end
 
 methods
@@ -41,7 +43,7 @@ methods
         vol = sw.volume(b);
         co = sw.coordinate(b);
         range = getrange(co, vol); % volume range
-        if (lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just assign; otherwise:
+        if (lb(1) < range(1) || lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just assign; otherwise:
             sw.flush(); % move sliding window (save all the previous data, prepare data variable)
             sw.move(limits); % + re-assignment of coordinate variable
         end
@@ -58,12 +60,17 @@ methods
         vol = sw.volume(b);
         co = sw.coordinate(b);
         range = getrange(co, vol);
-        if (lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just read; otherwise:
-            sw.flush(); % move sliding window (save all the previous data, prepare data variable)
+        sw.flush();
+        if (lb(1) < range(1) || lb(end) > range(end)) % chunk coordinates are within data range - do nothing, just read; otherwise:
+            % move sliding window (save all the previous data, prepare data variable)
             sw.move(limits); % + re-assignment of coordinate variable
         end
+        if (~sw.fdrawn)
+            sw.draw(); % transfer from file to sw.data
+        end
         limits{b} = sw.glo2loc(lb);
-        chunk = sw.gather(limits);
+        expr = subs2str(limits);
+        chunk = eval(['sw.data' expr]); % copy from sw.data to chunk
     end
     
     % Called from write(): moves chunk -> sw.data
@@ -72,14 +79,7 @@ methods
         eval(['sw.data' expr '=chunk;']);
         sw.fsaved = 0;
     end
-    
-    % Called from read(): moves sw.data -> chunk
-    function chunk = gather(sw, limits) % limits are in local scale
-        sw.draw(); % transfer from file to sw.data
-        expr = subs2str(limits);
-        chunk = eval(['sw.data' expr]); % copy from sw.data to chunk
-    end
-    
+        
     % Transformation of broken dimension from global [dimension] to local [volume] indexing
     function loc = glo2loc(sw, glo)
         b = sw.ibroken;
@@ -96,9 +96,11 @@ methods
     function move(sw, limits)
         b = sw.ibroken;
         sw.coordinate(b) = limits{b}(1);
+        sw.drawn = 0;
     end
     
-    % Called from gather(): transfer from file(-s) to sw.data
+    % Called from read(),gather(): transfer from file(-s) to sw.data only
+    % if the window coordinate changed (logic in read function)
     function draw(sw)
         b = sw.ibroken;
         vol = sw.volume(b);
@@ -119,6 +121,7 @@ methods
             fname = get_fname(sw.cpath, sw.vname, lidx);
             sw.rmemmap(fname, vol-offset+2, vol, 1, offset-1);
         end
+        sw.fdrawn = 1;
     end
     
     % Called from write(), read(), CachedNDArray.flush(): flushes sw.data
@@ -155,14 +158,15 @@ methods
     function rmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % read from memmapfile to sw.data
         b = sw.ibroken;        
         sz = size(sw.volume,2);
-        m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-        chunk = reshape(m.Data, sw.volume); % read the data from file
         subs_r = gensubs(sz);
         subs_l = subs_r;
         subs_r{b} = (ridx1:ridx2);
         subs_l{b} = (lidx1:lidx2);
         rhs = subs2str(subs_r);
-        lhs = subs2str(subs_l);        
+        lhs = subs2str(subs_l);
+        m = memmapfile(fname, 'Format', sw.type);
+        %subsref(reshape(m.Data, sw.volume), S);
+        chunk = reshape(m.Data, sw.volume); % read the data from file
         eval(['sw.data' lhs '=' 'chunk' rhs ';']);
     end
     
