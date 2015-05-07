@@ -8,15 +8,15 @@ classdef CachedNDArray
     %   avoids parameter by value and supports parameter by reference
     %   2015 victoria.rudakova(at)yale.edu
     
-    % Calculating if caching is needed or not (then an array is trated like a normal matlab array)
-    % Automatic brekage (if needed) in number of chunks
+    % Calculating if caching is needed or not (then an array is treated like a normal matlab array)
+    % Automatic breakage (if needed) in number of chunks
     % Asserts for errors (out of range etc)
-    % Broken multi-dimension, needs tests to see how the case will be dealt
-    % with
+    % Broken multi-dimension not supported
     
     properties (GetAccess = 'public', SetAccess = 'private')
         window; % class SlidingWindow
         cached; % flag for caching or not (normal array)
+        nchunks = 0;
     end
     
     methods
@@ -89,6 +89,7 @@ classdef CachedNDArray
                     progress_bar(i, nchunks);
                 end
                 fprintf('\n');
+                cnda.nchunks = nchunks;
             end
         end
         
