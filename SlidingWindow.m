@@ -162,22 +162,24 @@ methods
     
     % Called from draw(): function to read from memmapfile to sw.data
     function rmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % read from memmapfile to sw.data
-        b = sw.ibroken;        
-        sz = size(sw.volume,2);
-        subs_r = gensubs(sz);
-        subs_l = subs_r;
-        subs_r{b} = (ridx1:ridx2);
-        subs_l{b} = (lidx1:lidx2);
-        rhs = subs2str(subs_r);
-        lhs = subs2str(subs_l);
         m = memmapfile(fname, 'Format', sw.type);
-        if (~sw.fast)
-            chunk = reshape(m.Data, sw.volume); % read the data from file
-            eval(['sw.data' lhs '=' 'chunk' rhs ';']); % slowest operation since re-assignment of potentially large array
-        else
+        if (sw.fast)
             sw.data = reshape(m.Data, sw.volume); % this is where the speed up is for the fast method
             % we read the whole file into the window buffer without any
             % temporal variable copying (like for continious method)
+        else
+            b = sw.ibroken;
+            sz = size(sw.volume,2);
+            subs_r = gensubs(sz);
+            subs_l = subs_r;
+            subs_r{b} = (ridx1:ridx2);
+            subs_l{b} = (lidx1:lidx2);
+            rhs = subs2str(subs_r);
+            lhs = subs2str(subs_l);
+            chunk = reshape(m.Data, sw.volume); % read the data from file
+            eval(['sw.data' lhs '=' 'chunk' rhs ';']); % slowest operation since 
+            % re-assignment of potentially large array (matlab has to recopy the whole array,
+            % even if only a small part was changed)            
         end
     end
     
@@ -187,7 +189,9 @@ methods
         b = sw.ibroken;        
         sz = size(sw.volume,2);
         m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-        if (~sw.fast)
+        if (sw.fast)
+            m.Data = sw.data;
+        else
             chunk = reshape(m.Data, sw.volume); % read the data which is already in file
             subs_r = gensubs(sz);
             subs_l = subs_r;
@@ -197,8 +201,6 @@ methods
             lhs = subs2str(subs_l);
             eval(['chunk' lhs '=' 'sw.data' rhs ';']);
             m.Data = chunk;
-        else % for discrete processing
-            m.Data = sw.data;
         end
     end
 end
