@@ -58,7 +58,7 @@ classdef CachedNDArray
             assert(sum(broken > length(dims)) == 0, ...
                 'One (or more) index of broken dimensions is larger than total number of dimensions');
             
-            if (fcahcing <= 0) % -1 automatic detection
+            if (fcaching <= 0) % -1 automatic detection
                 reqmem = whos(dims, type);
                 freemem = getmem();
                 if (freemem > 1.3*1.2*reqmem) % assume it's 20%*30% more than required to allow for other side variables

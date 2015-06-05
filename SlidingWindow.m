@@ -12,12 +12,12 @@ properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
     coordinate; % sliding chunk location in global coordinates
     data; % data container (of size volume)
     ibroken; % indices of broken dimensions, only 1 dimension is supported in this version
-    type; % data type, in string format
+    type; % data type, in string format, e.g., 'double', 'single' etc
     dimension; % overall dimension of CachedNDArray
-    fsaved = 1; % flag inficating of data needs to be saved
+    fsaved = 1; % flag indicating if data needs to be flushed (saved)
     fdrawn = 0; % flag indicating if data needs to be drawn from file(-s)
-    cpath = 'cache';
-    vname = 'tmp';
+    cpath = 'cache'; % folder location where cache variables are saved
+    vname = 'tmp'; % under what name the variables will be saved
     fast = 1; % fast(blockwise, discrete) or slow (sliding, continious) window type
     nopen = 1; % number of possible files to open at the same time (<=1 if fast reading, <=2 otherwise)
 end
@@ -119,7 +119,7 @@ methods
         end
         assert(fidx <= lidx, 'Indexing calculation failed');
         nfiles = (fidx ~= lidx) + 1;
-        assert(nfiles <= 2, 'Number of files to open: calculation failed');
+        assert(nfiles <= sw.nopen, 'Number of files to open: calculation failed');
         offset = getidxb(co, vol);
         fname = get_fname(sw.cpath, sw.vname, fidx);
         sw.rmemmap(fname, 1, vol-offset+1, offset, vol);
@@ -171,9 +171,14 @@ methods
         rhs = subs2str(subs_r);
         lhs = subs2str(subs_l);
         m = memmapfile(fname, 'Format', sw.type);
-        %subsref(reshape(m.Data, sw.volume), S);
-        chunk = reshape(m.Data, sw.volume); % read the data from file
-        eval(['sw.data' lhs '=' 'chunk' rhs ';']);
+        if (~sw.fast)
+            chunk = reshape(m.Data, sw.volume); % read the data from file
+            eval(['sw.data' lhs '=' 'chunk' rhs ';']); % slowest operation since re-assignment of potentially large array
+        else
+            sw.data = reshape(m.Data, sw.volume); % this is where the speed up is for the fast method
+            % we read the whole file into the window buffer without any
+            % temporal variable copying (like for continious method)
+        end
     end
     
     % Called from flush(): function to write sw.data content to associated
