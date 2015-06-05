@@ -84,6 +84,13 @@ classdef CachedNDArray
                     end
                 end
                 
+                if ~exist(path_cache)
+                    mkdir(path_cache);
+                else
+                    delete([path_cache var_name '*.dat']);
+                    warning('Cache folder has been cleared from previous cache data.');
+                end
+                
                 fprintf('Cached N-d Array is being initialized: ');
                 vol = dims;
                 vol(broken) = ceil(dims(broken) / nchunks);
