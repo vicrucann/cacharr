@@ -6,12 +6,18 @@ classdef CachedNDArray
     %   chunks using memmapfile function
     %   The data structure is inhereted from handle abstract class which
     %   avoids parameter by value and supports parameter by reference
-    %   2015 victoria.rudakova(at)yale.edu
+    %   Supports two types of movement - continious (very slow) and
+    %   discrete (fast) which means that data is processed chunk after
+    %   chunk and each chunk is represented as a file; as contrary, the
+    %   continious moving might have no more than two file to represent a
+    %   chunk. 
+    %   2015 Victoria Rudakova vicrucann(at)gmail.com
     
-    % Calculating if caching is needed or not (then an array is treated like a normal matlab array)
+    % Calculating of caching is needed or not (then an array is treated like a normal matlab array)
     % Automatic breakage (if needed) in number of chunks
     % Asserts for errors (out of range etc)
     % Broken multi-dimension not supported
+    % Choice of discrete or continious data processing
     
     properties (GetAccess = 'public', SetAccess = 'private')
         window; % class SlidingWindow
@@ -20,7 +26,13 @@ classdef CachedNDArray
     end
     
     methods
-        function cnda = CachedNDArray(dims, type, broken, var_name, path_cache, nchunks)
+        function cnda = CachedNDArray(dims, type, broken, var_name, path_cache, nchunks, fcaching, fdiscrete)
+            if (nargin < 8)
+                fdiscrete = 0; % set to continous (slower performance) by default
+            end
+            if (nargin < 7)
+                fcaching = -1;
+            end
             if (nargin < 6) 
                 nchunks = zeros(1, length(broken)); 
             else
@@ -46,20 +58,22 @@ classdef CachedNDArray
             assert(sum(broken > length(dims)) == 0, ...
                 'One (or more) index of broken dimensions is larger than total number of dimensions');
             
-            reqmem = whos(dims, type);
-            freemem = getmem();
-            if (freemem > 1.3*1.2*reqmem) % assume it's 20%*30% more than required to allow for other side variables
-                fprintf('No caching will be used, there is enough memory \n');
-                cnda.cached = 0;
-            else
-                warning('Not enough memory: caching will be used. Processing time will be slower. ');
-                cnda.cached = 1;
-            end
-            
-            %cnda.cached = 1; % for testing, remove in release
+            if (fcahcing <= 0) % -1 automatic detection
+                reqmem = whos(dims, type);
+                freemem = getmem();
+                if (freemem > 1.3*1.2*reqmem) % assume it's 20%*30% more than required to allow for other side variables
+                    fprintf('No caching will be used, there is enough memory \n');
+                    cnda.cached = 0;
+                else
+                    warning('Not enough memory: caching will be used. Processing time will be slower. ');
+                    cnda.cached = 1;
+                end
+            elseif (fcaching == 1)
+                    cnda.cached = 1;
+            end            
             
             if (~cnda.cached)
-                cnda.window = SlidingWindow(ones(size(dims)), dims, 0, type, dims, [], []);
+                cnda.window = SlidingWindow(ones(size(dims)), dims, 0, type, dims, [], [], 0);
                 %cnda.window.data = zeros(dims, type);
             else
                 if (sum(nchunks) == 0) % need to divide memory into number of chunks
@@ -74,7 +88,7 @@ classdef CachedNDArray
                 vol = dims;
                 vol(broken) = ceil(dims(broken) / nchunks);
                 coord = ones(size(dims));
-                cnda.window = SlidingWindow(coord, vol, broken, type, dims, path_cache, var_name);
+                cnda.window = SlidingWindow(coord, vol, broken, type, dims, path_cache, var_name, fdiscrete);
                 
                 for i = 1:nchunks % for each chunk
                     fname = get_fname(path_cache, var_name, i);

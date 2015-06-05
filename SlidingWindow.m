@@ -5,7 +5,7 @@ classdef SlidingWindow < handle
     % The class is only accessible by CachedNDArray class and its
     % functions, and therefore is meant to be called only from
     % CachedNDArray functions.
-    %   2015 victoria.rudakova(at)yale.edu
+    %   2015 Victoria Rudakova vicrucann(at)gmail.com
     
 properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
     volume; % size of the sliding chunk
@@ -18,12 +18,13 @@ properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
     fdrawn = 0; % flag indicating if data needs to be drawn from file(-s)
     cpath = 'cache';
     vname = 'tmp';
-    fast = 1; % fast(blockwise) or slow (sliding) window type
+    fast = 1; % fast(blockwise, discrete) or slow (sliding, continious) window type
+    nopen = 1; % number of possible files to open at the same time (<=1 if fast reading, <=2 otherwise)
 end
 
 methods
     % A window constructor, called by CachedNDArray constructor
-    function sw = SlidingWindow(coord, vol, broken, type, dim, cpath, vname)
+    function sw = SlidingWindow(coord, vol, broken, type, dim, cpath, vname, fdiscrete)
         assert(sum(size(vol) == size(coord)) ~= 0, 'Dimension number mismatch.');
         sw.volume = vol;
         sw.coordinate = coord;
@@ -33,6 +34,8 @@ methods
         sw.dimension = dim;
         sw.cpath = cpath;
         sw.vname = vname;
+        sw.fast = fdiscrete;
+        sw.nopen = -1*sw.fast+2;
     end
     
     % Called by CachedNDArray.subsasgn() to assign chunk variable to the
@@ -78,6 +81,9 @@ methods
         expr = subs2str(limits);
         eval(['sw.data' expr '=chunk;']);
         sw.fsaved = 0;
+        if (sw.fast)
+            sw.flush();
+        end
     end
         
     % Transformation of broken dimension from global [dimension] to local [volume] indexing
@@ -139,7 +145,7 @@ methods
             end
             assert(fidx <= lidx, 'Indexing calculation failed');
             nfiles = (fidx ~= lidx) + 1;
-            assert(nfiles <= 2, 'Number of files to open: calculation failed');
+            assert(nfiles <= sw.nopen, 'Number of files to open: calculation failed');
             offset = getidxb(co, vol);
             fname = get_fname(sw.cpath, sw.vname, fidx);
             sw.wmemmap(fname, offset, vol, 1, vol-offset+1);
@@ -176,15 +182,19 @@ methods
         b = sw.ibroken;        
         sz = size(sw.volume,2);
         m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
-        chunk = reshape(m.Data, sw.volume); % read the data which is already in file
-        subs_r = gensubs(sz);
-        subs_l = subs_r;
-        subs_r{b} = (ridx1:ridx2);
-        subs_l{b} = (lidx1:lidx2);
-        rhs = subs2str(subs_r);
-        lhs = subs2str(subs_l);        
-        eval(['chunk' lhs '=' 'sw.data' rhs ';']);
-        m.Data = chunk;
+        if (~sw.fast)
+            chunk = reshape(m.Data, sw.volume); % read the data which is already in file
+            subs_r = gensubs(sz);
+            subs_l = subs_r;
+            subs_r{b} = (ridx1:ridx2);
+            subs_l{b} = (lidx1:lidx2);
+            rhs = subs2str(subs_r);
+            lhs = subs2str(subs_l);
+            eval(['chunk' lhs '=' 'sw.data' rhs ';']);
+            m.Data = chunk;
+        else % for discrete processing
+            m.Data = sw.data;
+        end
     end
 end
 
