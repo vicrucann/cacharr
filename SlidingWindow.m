@@ -102,7 +102,7 @@ methods
     function move(sw, limits)
         b = sw.ibroken;
         sw.coordinate(b) = limits{b}(1);
-        sw.drawn = 0;
+        sw.fdrawn = 0;
     end
     
     % Called from read(),gather(): transfer from file(-s) to sw.data only
