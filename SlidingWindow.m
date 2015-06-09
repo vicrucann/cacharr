@@ -101,7 +101,12 @@ methods
     % to a new coordinate
     function move(sw, limits)
         b = sw.ibroken;
-        sw.coordinate(b) = limits{b}(1);
+        if (sw.fast)
+            vol = sw.volume(b);
+            sw.coordinate(b) = (getidxchunk(limits{b}(1), vol) - 1) * vol + 1;
+        else
+            sw.coordinate(b) = limits{b}(1);
+        end
         sw.fdrawn = 0;
     end
     
@@ -119,6 +124,9 @@ methods
         end
         assert(fidx <= lidx, 'Indexing calculation failed');
         nfiles = (fidx ~= lidx) + 1;
+        if (nfiles>sw.nopen) % for debug purposes
+            fprintf('co=%i, vol=%i, fidx=%i, nchunks=%i, lidx=%i, nfiles=%i\n', co, vol, nchunks, fidx, lidx, nfiles);
+        end
         assert(nfiles <= sw.nopen, 'Number of files to open: calculation failed');
         offset = getidxb(co, vol);
         fname = get_fname(sw.cpath, sw.vname, fidx);
