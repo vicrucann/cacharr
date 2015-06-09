@@ -1,4 +1,4 @@
-classdef CachedNDArray
+classdef CachedNDArray < handle
     %CachedNDArray - data structure that allows to deal with large
     %N-dimensional arrays through caching method
     %   Allows to avoid Matlab out of memory error by caching large array
