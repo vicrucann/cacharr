@@ -114,6 +114,18 @@ classdef CachedNDArray < handle
             end
         end
         
+        function ib = ibroken(cnda)
+            ib = cnda.window.ibroken;
+        end
+        
+        function dims = dimension(cnda)
+            dims = cnda.window.dimension;
+        end
+        
+        function t = type(cnda)
+            t = cnda.window.type;
+        end
+        
         function cnda = subsasgn(cnda, S, chunk)
             if (strcmp(S(1).type, '()') )
                 if (cnda.cached)
