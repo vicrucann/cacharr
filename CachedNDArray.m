@@ -188,6 +188,22 @@ classdef CachedNDArray < handle
             cnda.window.flush();
             success = 1;
         end
+        
+        % "Dirty" fast read function in order to avoid computationally heavy
+        % strcat when translating input parameters cell into string (for cases
+        % when reading is necessary in a for loop).
+        % Use with caution, the function does not check for range
+        % correctness or any other user input mistakes.
+        % Use as a next form (with round brakets):
+        % chunk = cnda.quick_read(['(:,:,' num2str(val1) ':' num2str(val2) ',:)'], val1); 
+        % To replace the normal expression:
+        % chunk = cnda(:,:,val1:val2,:);
+        % where val1 and val2 are the indices of the same chunk of broken
+        % dimension. It could also be a singleton:
+        % chunk = cnda(:,:,val1); ->
+        % chunk = cnda.quick_read(['(:,:,' num2str(val1)')'], val1);
+        function chunk = quick_read(cnda, expr, val_broken)
+        end
     end
     
 end
