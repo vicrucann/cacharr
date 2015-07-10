@@ -203,6 +203,7 @@ classdef CachedNDArray < handle
         % chunk = cnda(:,:,val1); ->
         % chunk = cnda.quick_read(['(:,:,' num2str(val1)')'], val1);
         function chunk = quick_read(cnda, expr, val_broken)
+            chunk = cnda.window.quick_read(expr, val_broken);
         end
     end
     
