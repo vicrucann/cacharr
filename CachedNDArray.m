@@ -161,19 +161,20 @@ classdef CachedNDArray < handle
         function chunk = subsref(cnda, S)
             if (strcmp(S(1).type, '()') )
                 if (cnda.cached)
-                    limits = S(1).subs;
+                    %limits = S(1).subs;
                     % make sure chunk limits are within global dimension
-                    for i = 1:size(limits,2)
-                        if (strcmp(limits(i), ':'))
-                            continue;
-                        end
-                        assert(limits{i}(end) <= cnda.window.dimension(i) && limits{i}(1) >= 1, ...
-                            'Reference operator: out of range NDArray');
-                    end
-                    chunk = cnda.window.read(S(1).subs);
-                else
-                    chunk = builtin('subsref', cnda.window.data, S);
+%                     for i = 1:size(limits,2)
+%                         if (strcmp(limits(i), ':'))
+%                             continue;
+%                         end
+%                         assert(limits{i}(end) <= cnda.window.dimension(i) && limits{i}(1) >= 1, ...
+%                             'Reference operator: out of range NDArray');
+%                     end
+                    S = cnda.window.read(S);
+                    %chunk = builtin('subsref', cnda.window.data, S);
                 end
+                chunk = builtin('subsref', cnda.window.data, S);
+                %end
             else
                 chunk = builtin('subsref', cnda, S);
             end
@@ -189,22 +190,6 @@ classdef CachedNDArray < handle
             success = 1;
         end
         
-        % "Dirty" fast read function in order to avoid computationally heavy
-        % strcat when translating input parameters cell into string (for cases
-        % when reading is necessary in a for loop).
-        % Use with caution, the function does not check for range
-        % correctness or any other user input mistakes.
-        % Use as a next form (with round brakets):
-        % chunk = cnda.quick_read(['(:,:,' num2str(val1) ':' num2str(val2) ',:)'], val1); 
-        % To replace the normal expression:
-        % chunk = cnda(:,:,val1:val2,:);
-        % where val1 and val2 are the indices of the same chunk of broken
-        % dimension. It could also be a singleton:
-        % chunk = cnda(:,:,val1); ->
-        % chunk = cnda.quick_read(['(:,:,' num2str(val1)')'], val1);
-        function chunk = quick_read(cnda, expr, val_broken)
-            chunk = cnda.window.quick_read(expr, val_broken);
-        end
     end
     
 end

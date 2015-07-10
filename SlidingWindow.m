@@ -56,7 +56,8 @@ methods
     
     % Called by CachedNDArray.subsref() to read from the memory to a chunk
     % variable
-    function chunk = read(sw, limits)
+    function S = read(sw, S)
+        limits = S(1).subs;
         % TO DO: make sure there is enough memory to create chunk of given limits
         b = sw.ibroken;
         lb = limits{b};
@@ -72,31 +73,12 @@ methods
             sw.draw(); % transfer from file to sw.data
         end
         limits{b} = sw.glo2loc(lb);
-        expr = subs2str(limits);
-        chunk = eval(['sw.data' expr]); % copy from sw.data to chunk
+        S(1).subs = limits;
+        %chunk = builtin('subsref', sw.data, S);
+        %expr = subs2str(limits);
+        %chunk = eval(['sw.data' expr]); % copy from sw.data to chunk
     end
-    
-    % Called by CachedNDArray.quick_read() to read from the memory to a
-    % chunk variable using the user-provided expression (string format) and
-    % starting index of a broken dimension to define which block to read
-    % from memory
-    function chunk = quick_read(sw, expr, idx)
-        b = sw.ibroken;
-        lb = idx;
-        vol = sw.volume(b);
-        co = sw.coordinate(b);
-        range = getrange(co, vol);
-        sw.flush();
-        if (lb < range(1) || lb > range(end))
-            sw.coordinate(b) = (getidxchunk(idx, vol) - 1) * vol + 1;
-            sw.fdrawn = 0;
-        end
-        if (~sw.fdrawn)
-            sw.draw();
-        end
-        chunk = eval(['sw.data' expr]);
-    end
-    
+     
     % Called from write(): moves chunk -> sw.data
     function assign(sw, limits, chunk)
         expr = subs2str(limits);
