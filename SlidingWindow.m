@@ -20,6 +20,7 @@ properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
     vname = 'tmp'; % under what name the variables will be saved
     fast = 1; % fast(blockwise, discrete) or slow (sliding, continious) window type
     nopen = 1; % number of possible files to open at the same time (<=1 if fast reading, <=2 otherwise)
+    mmap = 0;
 end
 
 methods
@@ -170,9 +171,9 @@ methods
     
     % Called from draw(): function to read from memmapfile to sw.data
     function rmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % read from memmapfile to sw.data
-        m = memmapfile(fname, 'Format', sw.type);
+        sw.mmap = memmapfile(fname, 'Format', sw.type);
         if (sw.fast)
-            sw.data = reshape(m.Data, sw.volume); % this is where the speed up is for the fast method
+            sw.data = reshape(sw.mmap.Data, sw.volume); % this is where the speed up is for the fast method
             % we read the whole file into the window buffer without any
             % temporal variable copying (like for continious method)
         else
@@ -184,7 +185,7 @@ methods
             subs_l{b} = (lidx1:lidx2);
             rhs = subs2str(subs_r);
             lhs = subs2str(subs_l);
-            chunk = reshape(m.Data, sw.volume); % read the data from file
+            chunk = reshape(sw.mmap.Data, sw.volume); % read the data from file
             eval(['sw.data' lhs '=' 'chunk' rhs ';']); % slowest operation since 
             % re-assignment of potentially large array (matlab has to recopy the whole array,
             % even if only a small part was changed)            
@@ -196,11 +197,11 @@ methods
     function wmemmap(sw, fname, lidx1, lidx2, ridx1, ridx2) % write sw.data to memmapfile
         b = sw.ibroken;        
         sz = size(sw.volume,2);
-        m = memmapfile(fname, 'Format', sw.type, 'Writable', true);
+        sw.mmap = memmapfile(fname, 'Format', sw.type, 'Writable', true);
         if (sw.fast)
-            m.Data = sw.data;
+            sw.mmap.Data = sw.data;
         else
-            chunk = reshape(m.Data, sw.volume); % read the data which is already in file
+            chunk = reshape(sw.mmap.Data, sw.volume); % read the data which is already in file
             subs_r = gensubs(sz);
             subs_l = subs_r;
             subs_r{b} = (ridx1:ridx2);
@@ -208,7 +209,7 @@ methods
             rhs = subs2str(subs_r);
             lhs = subs2str(subs_l);
             eval(['chunk' lhs '=' 'sw.data' rhs ';']);
-            m.Data = chunk;
+            sw.mmap.Data = chunk;
         end
     end
 end
