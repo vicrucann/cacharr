@@ -26,7 +26,10 @@ classdef CachedNDArray < handle
     end
     
     methods
-        function cnda = CachedNDArray(dims, type, broken, var_name, path_cache, nchunks, fcaching, fdiscrete)
+        function cnda = CachedNDArray(dims, type, broken, var_name, path_cache, nchunks, fcaching, fdiscrete, ini_val)
+            if (nargin < 9)
+                ini_val = 0;
+            end
             if (nargin < 8)
                 fdiscrete = 0; % set to continous (slower performance) by default
             end
@@ -73,7 +76,7 @@ classdef CachedNDArray < handle
             end            
             
             if (~cnda.cached)
-                cnda.window = SlidingWindow(ones(size(dims)), dims, 0, type, dims, [], [], 0);
+                cnda.window = SlidingWindow(ones(size(dims)), dims, 0, type, dims, [], [], 0, ini_val);
                 %cnda.window.data = zeros(dims, type);
             else
                 if (sum(nchunks) == 0) % need to divide memory into number of chunks
@@ -95,7 +98,7 @@ classdef CachedNDArray < handle
                 vol = dims;
                 vol(broken) = ceil(dims(broken) / nchunks);
                 coord = ones(size(dims));
-                cnda.window = SlidingWindow(coord, vol, broken, type, dims, path_cache, var_name, fdiscrete);
+                cnda.window = SlidingWindow(coord, vol, broken, type, dims, path_cache, var_name, fdiscrete, ini_val);
                 
                 for i = 1:nchunks % for each chunk
                     fname = get_fname(path_cache, var_name, i);

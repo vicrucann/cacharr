@@ -21,15 +21,25 @@ properties (GetAccess = ?CachedNDArray, SetAccess = ?CachedNDArray)
     fast = 1; % fast(blockwise, discrete) or slow (sliding, continious) window type
     nopen = 1; % number of possible files to open at the same time (<=1 if fast reading, <=2 otherwise)
     mmap = 0;
+    ini_val = 0;
 end
 
 methods
     % A window constructor, called by CachedNDArray constructor
-    function sw = SlidingWindow(coord, vol, broken, type, dim, cpath, vname, fdiscrete)
+    function sw = SlidingWindow(coord, vol, broken, type, dim, cpath, vname, fdiscrete, ini_val)
         assert(sum(size(vol) == size(coord)) ~= 0, 'Dimension number mismatch.');
         sw.volume = vol;
         sw.coordinate = coord;
-        sw.data = zeros(vol, type);
+        if (ini_val == 0)
+            sw.data = zeros(vol, type);
+        elseif (ini_val == 1)
+            sw.data = ones(vol, type);
+        elseif (ini_val == inf)
+            sw.data = inf(vol, type);
+        else
+            assert(ini_val > 1, 'Initial value must be positive integer\n');
+            sw.data = ones(vol, type) * ini_val;
+        end
         sw.ibroken = broken;
         sw.type = type;
         sw.dimension = dim;
@@ -164,7 +174,7 @@ methods
             end
             % mark the properties flushed
             sw.coordinate = sw.coordinate * 0 + 1;
-            sw.data = sw.data*0;
+            sw.data = sw.data * 0 + sw.ini_val;
             sw.fsaved = 1;
         end
     end
