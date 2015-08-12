@@ -35,9 +35,13 @@ The main idea of the caching data type is to keep that large N-dimensional array
 
 ![Alt text](https://github.com/vicrucann/cacharr/blob/master/img/cached.png)  
 
-When we try to allocate a variable which takes more space than what we have in Matlab's available memory, the Matlab throws out-of-memory error. With the caching variable, it saves the data to the disk by breaking the data into smaller chunks and saving to different files as shown on the right of the figure. When we request an operator of assignment or reference of the certain range of the cached data, the part of the data is read directly into Matlab memory so that we could process it as if we deal with a normal Matlab array.
+When we try to allocate a variable which takes more space than what we have in Matlab's available memory, the Matlab throws out-of-memory error. With the caching variable, we save the data to the disk by breaking the data into smaller chunks and saving to different files as shown on the right of the figure. When we request an operator of assignment or reference of the certain range of the cached data, the part of the data is read directly into Matlab memory so that we could process it as if we deal with a normal Matlab array.
 
 #### Fast access procedures - an overview
+
+In order to perform the access procedures, we have to figure out the fastest way to do read/write with the range of files kept on disk. The well-known functions such as `load`, `save` or even `fwrite`, `fread` are not fast enough for that. Therefore, we use the Matlab's `memmapfile` in order to create a memory map to each of the file. 
+
+The `memmapfile` is incorporated into the `subsasgn` and `subsref` functions which are redefined in CachedNDArray class. 
 
 #### Discreet vs. continious caching
 
