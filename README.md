@@ -1,5 +1,15 @@
 # CachedNDArray - Matlab N-dimensional array with caching possiblity
 
+## Content
+* [Short description](https://github.com/vicrucann/cacharr#short-description)
+* [Quick start](https://github.com/vicrucann/cacharr#quick-start)
+* [Class description, specifics and usage](https://github.com/vicrucann/cacharr#class-description-specifics-and-usage)
+  * [Main principle behind the caching through Matlab](https://github.com/vicrucann/cacharr#main-principle-behind-the-caching-through-matlab)
+  * [Fast access procedures - an overview](https://github.com/vicrucann/cacharr#fast-access-procedures---an-overview)
+  * [Discreet vs. continious caching](https://github.com/vicrucann/cacharr#discreet-vs-continious-caching)
+  * [Interface signatures](https://github.com/vicrucann/cacharr#interface-signatures)
+* [Notes and contact](https://github.com/vicrucann/cacharr#notes-and-contact)
+
 ## Short description  
 
 CachedNDArray - data structure that allows to deal with large N-dimensional arrays through caching method: 
@@ -48,7 +58,7 @@ where
 * `fdiscreet` - a flag to define discreet (fast) or continious (slow) caching. If not initialized, the slow caching is used.  
 * `ini_val` - is an initial value that array will be initialized with, e.g. `ini_val = 1.5`, `ini_val = inf`. If this parameter is not provided, by default it is set to `0`.
 
-## Notes  
+## Notes and contact 
 
 The class was originally created as a part of a software package [cryo3d](https://github.com/vicrucann/cryo3d) for fast 3d reconstruction of protein structure from microscopic images.
 
