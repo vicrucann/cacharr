@@ -21,7 +21,7 @@ CachedNDArray - data structure that allows to deal with large N-dimensional arra
 
 ## Quick start
 
-Use the provided test script `test_CachedNDArray.m` in order to run an example. The provided test includes small scale example (using small array) and a large-scale example when comparing discreet and continious caching.
+Use the provided test script `test_CachedNDArray.m` in order to run an example. The provided test includes small scale example (using small array) and a large-scale example when comparing discreet and continious caching for read/write operators.
 
 ## Class description, specifics and usage
 
@@ -77,17 +77,33 @@ where
 The assignment operator has the same signature as when dealing with a normal Matlab array:  
 ```
 cnda(:,1:10,:,:) = chunk;
+cnda.flush(); % to flush changes to the file on disk when dealing with **continious** access solely
+```  
+or  
+```
+cnda(:,1:10,:,:) = chunk; % for discreet access no `flush()` is neeeded
 ```
 where  
-`chunk` - is the data chunk which we want to write to the `cnda` array. 
+`chunk` - is the data chunk which we want to write to the `cnda` array.  
 
-###### Read operator - `subsref`
+Note that the assignment operator must be accompanied by the `flush()` function (see below) for the continious caching access, while the flushing is done automatically when dealing with discreet type.
+
+###### Read operator - `subsref` 
+
 The reference operator has the same signature as when dealing with a normal Matlab array:  
 ```
 chunk = cnda(:, 80:end, :, :);
 ```
 where  
 `chunk` is the return data chunk which is copied from `cnda` array
+
+###### Flushing
+
+`flush()` is a function that performs dumping of the data buffer into the corresponding file(-s). The normal data buffer corresponds to one file on the disk (size-wise). When moving from one file to another, it is necessary to flush all the changed data to the file, since, when referring to the next data file, the data buffer will be overwritten.
+
+The flushing is not needed to be called manually when working with discreet access, since it is called every time after an assignment operator. Because of this, it is much more efficient to always assign the chunk as big as the data buffer (the size of one file representing the CachedNDArray).
+
+For the continuous access, the `flush()` function must be called manually when it is needed to dump the data buffer content to the file on disk.
 
 ## Notes and contact 
 

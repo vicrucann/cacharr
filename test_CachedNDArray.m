@@ -30,69 +30,75 @@ for j = 1:2:dims(1)-3
 end
 
 % larger scale example for continious vs. discreet methods
-fprintf('\nPress any key to continue on large-scale example\n');
-pause;
+%fprintf('\nPress any key to continue on large-scale example\n');
+%pause;
 
-dims = [10, 1000, 10, 50];
+t_cont = 0;
+t_discr = 0;
+
+dims = [100, 1000, 100, 500];
 broken = 2;
 type = 'single';
 
 tic;
-fprintf('allocation for continious method:\n');
+fprintf('\nAllocation (cont):\n');
 cnda = CachedNDArray(dims, type, broken, 'tmp-cnda-cnt', 'cache', 4, 1);
 fprintf('done\n');
-toc;
+t_cont = t_cont + toc;
 
 tic;
-fprintf('allocation for discreet method:\n');
+fprintf('\nAllocation (discr):\n');
 cnda_= CachedNDArray(dims, type, broken, 'tmp-cnda-dsc', 'cache', 4, 1, 1);
 fprintf('done\n');
-toc;
+t_discr = t_discr + toc;
 
 cdim = dims;
 clen = cnda.nchunks;
 cdim(broken) = floor(dims(broken) / clen);
 % write
 tic;
-fprintf('create chunk memory...');
+fprintf('\nCreate chunk memory...');
 chunk = rand(cdim, type);
 fprintf('done\n');
-toc;
+tmp = toc;
+t_cont = t_cont + tmp;
+t_discr = t_discr + tmp;
 
 tic;
-fprintf('assignment operator for continious method...');
+fprintf('\nAssignment operator (cont)...');
 cnda(:,1:floor(dims(broken) / clen),:,:) = chunk;
 fprintf('done\n');
-toc;
-
-tic;
-fprintf('assignment operator for discreet method (includes flush)...');
-cnda_(:,1:floor(dims(broken) / clen),:,:) = chunk;
-fprintf('done\n');
-toc;
+t_cont = t_cont + toc;
 
 %flush
 tic;
-fprintf('flushing operator (continious method)...')
-cnda.flush();
+fprintf('\nFlushing (cont)...')
+cnda.flush(); % write changes to the corresponding file
 fprintf('done\n');
-toc;
+t_cont = t_cont + toc;
+
+tic;
+fprintf('\nAssignment operator for (discr+flush)...');
+cnda_(:,1:floor(dims(broken) / clen),:,:) = chunk;
+fprintf('done\n');
+t_discr = t_discr + toc;
 
 % read
 tic;
-fprintf('reference operator (cont)...');
+fprintf('\nReference operator (cont)...');
 %chunk_x = cnda(:, 1:floor(dims(broken) / clen),:,:);
 chunk_x = cnda(1,10,:,:);
 fprintf('done\n');
-toc;
+t_cont = t_cont + toc;
 
 % read
 tic;
-fprintf('reference operator (discr)...');
+fprintf('\nReference operator (discr)...');
 %chunk_x = cnda(:, 1:floor(dims(broken) / clen),:,:);
 chunk_x = cnda_(1,10,:,:);
 fprintf('done\n');
-toc;
-%if (~isequal(chunk_x, chunk))
-%    error('Matrix equality failed');
-%end
+t_discr = t_discr + toc;
+
+% performance compare
+fprintf('\nContinious vs discreet total: \n');
+fprintf('%d     %d \n', t_cont, t_discr);
