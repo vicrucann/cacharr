@@ -1,4 +1,4 @@
-# CachedNDArray - MAtlab N-dimensional array with caching possiblity
+# CachedNDArray - Matlab N-dimensional array with caching possiblity
 
 ## Short description  
 
@@ -11,9 +11,23 @@ CachedNDArray - data structure that allows to deal with large N-dimensional arra
 
 ## Quick start
 
+Use the provided test script `test_CachedNDArray.m` in order to run an example. The provided test includes small scale example (using small array) and a large-scale example when comparing discreet and continious caching.
+
 ## Class description, specifics and usage
 
 #### Main principle behind the caching through Matlab
+
+The necessity for this project was caused by a common Matlab error when trying to allocate a large N-dimensional array. This was especially relevant in the context of the [cryo3d](https://github.com/vicrucann/cryo3d) project - a pipeline for fast 3D protein reconstruction from cryo-EM images.  
+
+The cryo3d pipeline, when run with very fine parameters, requires large computational resources and memory which are not always available. And it caused the mentioned **out-of-memory** error.  
+
+The main idea of the caching data type is to keep that large N-dimensional array on the disk instead of Matlab memory, and only keep its smaller part that is referred to when needed. It can also be explained by using the figure:  
+
+![Alt text](https://github.com/vicrucann/cacharr/blob/master/img/cached.png)  
+
+When we try to allocate a variable which takes more space than what we have in Matlab's available memory, the Matlab throws out-of-memory error. With the caching variable, it saves the data to the disk by breaking the data into smaller chunks and saving to different files as shown on the right of the figure. When we request an operator of assignment or reference of the certain range of the cached data, the part of the data is read directly into Matlab memory so that we could process it as if we deal with a normal Matlab array.
+
+#### Fast access procedures - an overview
 
 #### Discreet vs. continious caching
 
