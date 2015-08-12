@@ -41,11 +41,21 @@ When we try to allocate a variable which takes more space than what we have in M
 
 In order to perform the access procedures, we have to figure out the fastest way to do read/write with the range of files kept on disk. The well-known functions such as `load`, `save` or even `fwrite`, `fread` are not fast enough for that. Therefore, we use the Matlab's `memmapfile` in order to create a memory map to each of the file. 
 
-The `memmapfile` is incorporated into the `subsasgn` and `subsref` functions which are redefined in CachedNDArray class. 
+The `memmapfile` is incorporated into the `subsasgn` and `subsref` functions (bracket operators for reading and writing) which are redefined in CachedNDArray class. 
 
 #### Discreet vs. continious caching
 
+Depending on the CachedNDArray usage, we can define the caching to be discreet (fast) or continious (slow). The figure below helps to differentiate the two: 
+
+![Alt test](https://github.com/vicrucann/cacharr/blob/master/img/slow-fast.png)
+
+Since the data is split into chunks and each chunk is saved into a separate file, the discreet access would mean only accessing the chunks as they are written within the files as shown on the right, i.e. it is not possible to access a chunk of data that is shared between two files (as shown on the left of the figure). A basic example when we use the discreet caching: given 2D RGB array (color image), filter it so that only blue color is left.  
+
+As to the continious caching, the access chunk could be shared between the two consequitive files as shown on the left of the figure. However, it also comes with a price of much slower performance since there will be more copying/writing involved than if we access data dicretely. An example when we use the continious caching: given 2D RGB array (color image), smooth it out so that each output pixel equals to the average sum of its surrounding pixels.    
+
 #### Interface signatures  
+
+###### Constructor
 
 To create a CachedNDArray variable, it is necessary to use the constructor, e.g:  
 ```
@@ -61,6 +71,23 @@ where
 * `fcaching` - a caching flag. It is set to `-1` by default which triggers automatic decision whether to cache the data or not. It is possible to enforce the data to be cached always - use `fcaching = 1`, or to always suppress it by `fcaching = 0`; although it is advised to use the default value for most of the cases: `fcaching = -1`.  
 * `fdiscreet` - a flag to define discreet (fast) or continious (slow) caching. If not initialized, the slow caching is used.  
 * `ini_val` - is an initial value that array will be initialized with, e.g. `ini_val = 1.5`, `ini_val = inf`. If this parameter is not provided, by default it is set to `0`.
+
+###### Write operator - `subsasgn`
+
+The assignment operator has the same signature as when dealing with a normal Matlab array:  
+```
+cnda(:,1:10,:,:) = chunk;
+```
+where  
+`chunk` - is the data chunk which we want to write to the `cnda` array. 
+
+###### Read operator - `subsref`
+The reference operator has the same signature as when dealing with a normal Matlab array:  
+```
+chunk = cnda(:, 80:end, :, :);
+```
+where  
+`chunk` is the return data chunk which is copied from `cnda` array
 
 ## Notes and contact 
 
