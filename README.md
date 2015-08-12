@@ -21,7 +21,7 @@ CachedNDArray - data structure that allows to deal with large N-dimensional arra
 
 ## Quick start
 
-Use the provided test script `test_CachedNDArray.m` in order to run an example. The provided test includes small scale example (using small array) and a large-scale example when comparing discreet and continious caching for read/write operators.
+Use the provided test script `test_CachedNDArray.m` in order to run an example. The provided test includes small scale example (using small array) and a large-scale example when comparing discreet and continious caching for read/write operators. Note, depending on characteristics of your machine, it can take a while for the script to end since the large-scale example works with a 4D array of about 19Gb size in total (thus breaking the array into four 4.8Gb files).
 
 ## Class description, specifics and usage
 
@@ -104,6 +104,10 @@ where
 The flushing is not needed to be called manually when working with discreet access, since it is called every time after an assignment operator. Because of this, it is much more efficient to always assign the chunk as big as the data buffer (the size of one file representing the CachedNDArray).
 
 For the continuous access, the `flush()` function must be called manually when it is needed to dump the data buffer content to the file on disk.
+
+#### Specifics
+
+It is required that your machine's memory would be at least 24Gb so that Matlab could easily hold a data buffer of 8Gb (it is a default size for the data buffer) and also other side variables you might need. You could always change the default parameter to make it lower.
 
 ## Notes and contact 
 

@@ -78,7 +78,7 @@ fprintf('done\n');
 t_cont = t_cont + toc;
 
 tic;
-fprintf('\nAssignment operator for (discr+flush)...');
+fprintf('\nAssignment operator (discr+flush)...');
 cnda_(:,1:floor(dims(broken) / clen),:,:) = chunk;
 fprintf('done\n');
 t_discr = t_discr + toc;
@@ -101,4 +101,4 @@ t_discr = t_discr + toc;
 
 % performance compare
 fprintf('\nContinious vs discreet total: \n');
-fprintf('%d     %d \n', t_cont, t_discr);
+fprintf('%i     %i \n', t_cont, t_discr);
