@@ -95,11 +95,19 @@ where
 
 ###### Flushing
 
-`flush()` is a function that performs dumping of the data buffer into the corresponding file(-s). The normal data buffer corresponds to one file on the disk (size-wise). When moving from one file to another, it is necessary to flush all the changed data to the file, since, when referring to the next data file, the data buffer will be overwritten.
+`cnda.flush()` is a function that performs dumping of the data buffer into the corresponding file(-s). The normal data buffer (which is named as a `SlidingWindow`) corresponds to one file on the disk (size-wise and content-wise). When the `SlidingWindow` moves from one file to another, it flushes all the changed data to the corresponding file.  
 
-The flushing is not needed to be called manually when working with discreet access, since it is called every time after an assignment operator. Because of this, it is much more efficient to always assign the chunk as big as the data buffer (the size of one file representing the CachedNDArray).
+The flushing works differently for the discreet and continious access types. When working with discreet array, it is assumed that assignment is done chunk-wise and, therefore, flushing is done every time when we call an assignment operator. In this case, we never need to call the `flush()` function. Because of this, it is much more efficient to always assign the data chunk as big as the data buffer `SlidingWindow` (the size of one file representing the CachedNDArray). See the [Usage tips for discreet data access](https://github.com/vicrucann/cacharr#usage-tips-for-discreet-data-access) for more details and examples.  
 
-For the continuous access, the `flush()` function must be called manually when it is needed to dump the data buffer content to the file on disk.
+For the continuous access, the `flush()` function is called automatically only when the `SlidingWindow` coordinates change, e.g., when the user reads or writes from the file which is not represented by the `SlidingWindow`. Because of this specifics, it is necessary to  perform the `flush()` at the very end of the reading / writing loop so that the last chunk that we just wrote to is dumped to the file. Here is a code example:  
+```
+cnda = CachedNDArray([1000, 100, 100], 'double', 1, 'tmp', 'cache', 4, 1);
+for i = 1 : 1000
+    line2 = rand([2, 100, 100], 'double');
+    cnda(i:i+1, :, :) = line2;
+end
+cnda.flush(); % flush the last SlidingWindow
+``` 
 
 #### Usage tips for discreet data access 
 
@@ -135,7 +143,7 @@ indices_sort = sort(indices);
 for i = 1 : 4
     chunk = zeros(250, 100, 100);
     for j = (i-1)*250+1 : i*250
-        chunk(indices(j), :, :) = rand([1 100 100], 'double');
+        chunk(indices_sort(j), :, :) = rand([1 100 100], 'double');
     end
     cnda((i-1)*250+1 : i*250, :, :) = chunk;
 end
