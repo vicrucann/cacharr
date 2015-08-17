@@ -59,7 +59,8 @@ As to the continious caching, the access chunk could be shared between the two c
 
 To create a CachedNDArray variable, it is necessary to use the constructor, e.g:  
 ```
-cnda = CachedNDArray(dimensions, type, broken, var_name, work_path, nchunks, fcaching, fdiscreet, ini_val);
+cnda = CachedNDArray(dimensions, type, broken, ... 
+    var_name, work_path, nchunks, fcaching, fdiscreet, ini_val);
 ```  
 where  
 * `dimensions` - is the vector of form `[dim_1 dim_2 ... dim_n]` that defines the size of each array dimension.  
@@ -77,16 +78,11 @@ where
 The assignment operator has the same signature as when dealing with a normal Matlab array:  
 ```
 cnda(:,1:10,:,:) = chunk;
-cnda.flush(); % to flush changes to the file on disk when dealing with **continious** access solely
 ```  
-or  
-```
-cnda(:,1:10,:,:) = chunk; % for discreet access no `flush()` is neeeded
-```
 where  
 `chunk` - is the data chunk which we want to write to the `cnda` array.  
 
-Note that the assignment operator must be accompanied by the `flush()` function (see below) for the continious caching access, while the flushing is done automatically when dealing with discreet type.
+Note that the assignment operator must be accompanied by the `flush()` function (see below) in certain situations for the continious caching access; the flushing is done automatically when dealing with the discreet type.
 
 ###### Read operator - `subsref` 
 
@@ -105,9 +101,49 @@ The flushing is not needed to be called manually when working with discreet acce
 
 For the continuous access, the `flush()` function must be called manually when it is needed to dump the data buffer content to the file on disk.
 
+#### Usage tips for discreet data access 
+
+For the best performance it is strongly advised to design your program with accordance of the next two points:  
+* Discreet data access, i.e. elemnt-wise or line-wise so that each chunk to write is represented by a corresponding file. In case of the discreet data access, the assignment operator should be performed chunk-wise and linearly, i.e. it is useful to keep a variable `chunk` of a data buffer size and do assignment through this chunk of data.  
+* Sequential data access as opposed to random data access (for both discreet and continious access types).  
+
+The below code samples may be used as a reference of how it should and should not be implemented:  
+
+The chunk-wise sequential assignemnt operator (fastest way):  
+```
+cnda = CachedNDArray([1000 100 100], 'double', 1, 'tmp', 'cache', 4, 1, 1, 0);
+for i = 1 : 4
+    chunk = rand([250 100 100], 'double');
+    cnda((i-1)*250+1 : i*250, :, :) = chunk;
+end
+```  
+
+As opposed to the next example, when assignment operator is not done chunk-wise in a rather random order. This sample will perform much slower since there will be many more *write* operators called than in the code sample shown above.  
+```
+cnda = CachedNDArray([1000 100 100], 'double', 1, 'tmp', 'cache', 4, 1, 1, 0);
+indices = randperm(1000);
+for i = 1 : 1000
+    chunk = rand([1 100 100], 'double');
+    cnda(indices(i), :, :) = chunk; % not chunk-wise and not sequential access
+end
+```
+The above example could be run much faster if we do assignment chunk-wise and also sort the `indices` array in order to have the sequential access:  
+```
+cnda = CachedNDArray([1000 100 100], 'double', 1, 'tmp', 'cache', 4, 1, 1, 0);
+indices = randperm(1000);
+indices_sort = sort(indices);
+for i = 1 : 4
+    chunk = zeros(250, 100, 100);
+    for j = (i-1)*250+1 : i*250
+        chunk(indices(j), :, :) = rand([1 100 100], 'double');
+    end
+    cnda((i-1)*250+1 : i*250, :, :) = chunk;
+end
+```
+
 #### Specifics
 
-It is required that your machine's memory would be at least 24Gb so that Matlab could easily hold a data buffer of 8Gb (it is a default size for the data buffer) and also other side variables you might need. You could always change the default parameter to make it lower.
+It is required that your machine's memory could acommodate 8Gb of memory to hold the maximum size buffer data **plus** another 8-10Gb for any other side variables and/or processes. You could always change the default parameter of 8Gb to make the computational requirements lower inside the `CachedNDArray.m` file.
 
 ## Notes and contact 
 
