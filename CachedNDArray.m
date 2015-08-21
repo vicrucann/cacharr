@@ -26,32 +26,31 @@ classdef CachedNDArray < handle
     end
     
     methods
-        function cnda = CachedNDArray(dims, type, broken, var_name, path_cache, nchunks, fcaching, fdiscrete, ini_val)
-            if (nargin < 9)
-                ini_val = 0;
-            end
-            if (nargin < 8)
-                fdiscrete = 0; % set to continous (slower performance) by default
-            end
-            if (nargin < 7)
-                fcaching = -1;
-            end
-            if (nargin < 6) 
-                nchunks = zeros(1, length(broken)); 
-            else
-                assert(length(nchunks) == length(broken),...
-                    'Number of chunks in each dimension must correspond to number of broken dimensions');
-                assert(nchunks > 0, 'Number of chunks is a positive integer parameter');
-            end
-            if (nargin < 5) 
-                path_cache = 'cache'; 
-            end
-            if (nargin < 4) 
-                var_name = 'tmp'; 
-            end
-            if (nargin < 3) % user must always specify which dimension they intend to use borken
-                error('There must be at least 3 input parameters to create CachedNDArray variable.'); 
-            end
+        % constructor: minimum three parameters
+        % if more, specify the parameters like so: 
+        % (dims, broken, 'ini_val', 5, 'fdiscreet', 1, ...) in no particular order
+        % for optional parameters
+        function cnda = CachedNDArray(dims, broken, varargin) 
+            %, var_name, path_cache, nchunks, fcaching, fdiscrete, ini_val)
+            p = inputParser;
+            addRequired(p, 'dims', @isnumeric);
+            addRequired(p, 'broken', @isnumeric);
+            addParameter(p, 'type', 'double');
+            addParameter(p, 'var_name', 'tmp');
+            addParameter(p, 'path_cache', 'cache');
+            addParameter(p, 'nchunks', 0);
+            addParameter(p, 'ini_val', 0);
+            addParameter(p, 'fcaching', -1);
+            addParameter(p, 'fdiscreet', 1);
+            parse(p, dims, broken, varargin{:});
+            type = p.Results.type;
+            var_name = p.Results.var_name;
+            path_cache = p.Results.path_cache;
+            nchunks = p.Results.nchunks;
+            fcaching = p.Results.fcaching;
+            fdiscrete = p.Results.fdiscreet;
+            ini_val = p.Results.ini_val;
+            
             path_cache = correctpath(path_cache);
             
             assert(sum(dims <= 0) == 0, ...

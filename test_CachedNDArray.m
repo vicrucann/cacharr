@@ -6,13 +6,13 @@ clc;
 % small scale test
 dims = [20 10 2];
 broken = 1;
-type = 'double';
 nchunks = 2;
 fcaching = 1;
 fdiscreet = 0;
 ini_val = 0;
 
-cnda = CachedNDArray(dims, type, broken, 'tmp', 'cache', nchunks, fcaching, fdiscreet, ini_val);
+cnda = CachedNDArray(dims, broken, ...
+    'nchunks', nchunks, 'fcaching', fcaching, 'type', 'single', 'fdiscreet', fdiscreet);
 for i = 1:dims(1)-1
     line1 = ones(2,dims(2),1)*i;
     line2 = -line1;
@@ -42,13 +42,15 @@ type = 'single';
 
 tic;
 fprintf('\nAllocation (cont):\n');
-cnda = CachedNDArray(dims, type, broken, 'tmp-cnda-cnt', 'cache', 4, 1);
+cnda = CachedNDArray(dims, broken, 'type', type, 'var_name', 'tmp-cnda-cnt', 'nchunks', 4, 'fdiscreet', 0, ...
+    'fcaching', fcaching);
 fprintf('done\n');
 t_cont = t_cont + toc;
 
 tic;
 fprintf('\nAllocation (discr):\n');
-cnda_= CachedNDArray(dims, type, broken, 'tmp-cnda-dsc', 'cache', 4, 1, 1);
+cnda_= CachedNDArray(dims, broken,'type', type, 'var_name', 'tmp-cnda-dsc', 'nchunks', 4, 'ini_val', 1, ...
+    'fcaching', fcaching);
 fprintf('done\n');
 t_discr = t_discr + toc;
 
@@ -66,7 +68,7 @@ t_discr = t_discr + tmp;
 
 tic;
 fprintf('\nAssignment operator (cont)...');
-cnda(:,1:floor(dims(broken) / clen),:,:) = chunk;
+cnda(:,1+244:floor(dims(broken) / clen)+244,:,:) = chunk;
 fprintf('done\n');
 t_cont = t_cont + toc;
 
@@ -87,7 +89,7 @@ t_discr = t_discr + toc;
 tic;
 fprintf('\nReference operator (cont)...');
 %chunk_x = cnda(:, 1:floor(dims(broken) / clen),:,:);
-chunk_x = cnda(1,10,:,:);
+chunk_x = cnda(1,245:255,:,:);
 fprintf('done\n');
 t_cont = t_cont + toc;
 
@@ -95,10 +97,10 @@ t_cont = t_cont + toc;
 tic;
 fprintf('\nReference operator (discr)...');
 %chunk_x = cnda(:, 1:floor(dims(broken) / clen),:,:);
-chunk_x = cnda_(1,10,:,:);
+chunk_x = cnda_(1,1:10,:,:);
 fprintf('done\n');
 t_discr = t_discr + toc;
 
 % performance compare
 fprintf('\nContinious vs discreet total: \n');
-fprintf('%i     %i \n', t_cont, t_discr);
+fprintf('%.1f     %.1f \n', t_cont, t_discr);
