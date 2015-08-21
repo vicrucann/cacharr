@@ -3,6 +3,8 @@
 clear;
 clc;
 
+% first test for automatic case
+
 % small scale test
 dims = [20 10 2];
 broken = 1;
@@ -11,13 +13,21 @@ fcaching = 1;
 fdiscreet = 0;
 ini_val = 0;
 
+cnda_ = CachedNDArray(dims, broken, ...
+    'nchunks', nchunks, 'fcaching', fcaching, 'type', 'single', 'fdiscreet', fdiscreet);
+
 cnda = CachedNDArray(dims, broken, ...
     'nchunks', nchunks, 'fcaching', fcaching, 'type', 'single', 'fdiscreet', fdiscreet);
 for i = 1:dims(1)-1
     line1 = ones(2,dims(2),1)*i;
     line2 = -line1;
+    
+    cnda_(i:i+1,:,1) = line1;
+    cnda_(i:i+1,:,2) = line2;
+    
     cnda(i:i+1,:,1) = line1;
     cnda(i:i+1,:,2) = line2;
+    
 end
 
 cnda.flush();
