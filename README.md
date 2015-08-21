@@ -59,21 +59,37 @@ As to the continious caching, the access chunk could be shared between the two c
 
 To create a CachedNDArray variable, it is necessary to use the constructor, e.g:  
 ```
-cnda = CachedNDArray(dimensions, type, broken, ... 
-    var_name, work_path, nchunks, fcaching, fdiscreet, ini_val);
+cnda = CachedNDArray(dimensions, broken, ... 
+   'type', type, 'var_name', var_name, 'work_path', work_path, ...
+    'nchunks', nchunks, 'fcaching', fcaching, 'fdiscreet', fdiscreet, ...
+    'ini_val', ini_val);
 ```  
 where  
-* `dimensions` - is the vector of form `[dim_1 dim_2 ... dim_n]` that defines the size of each array dimension.  
-* `type` - is a string variable, e.g. `type = 'double'` to define the data type of the array;  
-* `broken` - is an integer which defines which dimension will be broken, e.g. for `broken = 2` the second dimension `dim_2` will be broken.  
-* `var_name` - is a string to defined under which name the caching data will be saved, e.g. if `var_name = 'tmp'`, the caching data will be stored in variables `{tmp1.dat, tmp2.dat, ... tmpn.dat}`.  
-* `work_path` is the directory path where the cached `*.dat` files will be stored, in string format.  
-* `nchunks` - is an integer which defines the number of chunks the array will be broken into. This variable could be left uninitialized (given all the variable are uninitialed after it); in this case an automatic breakage will be performed: by default the array will be broken into chunks no bigger than 8Gb each. 
-* `fcaching` - a caching flag. It is set to `-1` by default which triggers automatic decision whether to cache the data or not. It is possible to enforce the data to be cached always - use `fcaching = 1`, or to always suppress it by `fcaching = 0`; although it is advised to use the default value for most of the cases: `fcaching = -1`.  
-* `fdiscreet` - a flag to define discreet (fast) or continious (slow) caching. If not initialized, the slow caching is used.  
+* `dimensions` - is the vector of form `[dim_1 dim_2 ... dim_n]` that defines the size of each array dimension; it is mandatory parameter.  
+* `broken` - is an integer which defines which dimension will be broken, e.g. for `broken = 2` the second dimension `dim_2` will be broken; it is mandatory parameter.   
+* `type` - is a string variable, e.g. `type = 'double'` to define the data type of the array; optional parameter: if omitted, then the default value is set to `double`  
+* `var_name` - is a string to defined under which name the caching data will be saved, e.g. if `var_name = 'tmp'`, the caching data will be stored in variables `{tmp1.dat, tmp2.dat, ... tmpn.dat}`. Optional parameter: if omitted, then the default value is set to `tmp`.  
+* `work_path` is the directory path where the cached `*.dat` files will be stored, in string format. Optional parameter: if omitted, then the default value is set to `cache`. 
+* `nchunks` - is an integer which defines the number of chunks the array will be broken into. In case of an automatic breakage: by default the array will be broken into chunks no bigger than 8Gb each. Optional parameter: if omitted, then the default value is set to `0` (it will trigger automatic breakage).
+* `fcaching` - a caching flag. It is set to `-1` by default which triggers automatic decision whether to cache the data or not. It is possible to enforce the data to be cached always - use `fcaching = 1`, or to always suppress it by `fcaching = 0`; although it is advised to use the default value for most of the cases: `fcaching = -1`.  Optional parameter: if omitted, then the default value is set to `-1`. 
+* `fdiscreet` - a flag to define discreet (fast) or continious (slow) caching. If not initialized, the fast caching is used.  Optional parameter: if omitted, then the default value is set to `1`. 
 * `ini_val` - is an initial value that array will be initialized with, e.g. `ini_val = 1.5`, `ini_val = inf`. If this parameter is not provided, by default it is set to `0`.
-
 ###### Write operator - `subsasgn`
+
+An example of how to use the constructor:  
+```
+cnda = CachedNDArray([100, 1000, 500, 500], 2, ...
+    'type', 'single', 'var_name', 'cnda1', 'nchunks', 5, ...
+    'fcaching', 1, 'fdiscreet', 0, 'ini_val', inf);
+```
+In the above example, the `cnda` variable is initialized as a CachedNDArray with the next parameters:  
+* it is of size `[100, 1000, 500, 500]`
+* type `single`
+* with initial value of `inf`
+* with second broken dimension, i.e. it will be broken into five chunks of size `[100, 200, 500, 500]`
+* it is mandatory cached - no matter if there is enough memory in the Matlab workspace or not  
+* the cached data is saved on disk in current folder under names `{cnda11.dat, cnda12.dat, cnda13.dat, cnda14.dat, cnda15.dat}`
+* it is assumed that data is processed chunk-wise 
 
 The assignment operator has the same signature as when dealing with a normal Matlab array:  
 ```
@@ -119,7 +135,7 @@ The below code samples may be used as a reference of how it should and should no
 
 The chunk-wise sequential assignemnt operator (fastest way):  
 ```
-cnda = CachedNDArray([1000 100 100], 'double', 1, 'tmp', 'cache', 4, 1, 1, 0);
+cnda = CachedNDArray([1000 100 100], 1, 'nchunks', 4, 'fcaching', 1);
 for i = 1 : 4
     chunk = rand([250 100 100], 'double');
     cnda((i-1)*250+1 : i*250, :, :) = chunk;
@@ -128,7 +144,7 @@ end
 
 As opposed to the next example, when assignment operator is not done chunk-wise in a rather random order. This sample will perform much slower since there will be many more *write* operators called than in the code sample shown above.  
 ```
-cnda = CachedNDArray([1000 100 100], 'double', 1, 'tmp', 'cache', 4, 1, 1, 0);
+cnda = CachedNDArray([1000 100 100], 1,'nchunks', 4, 'fcaching', 1);
 indices = randperm(1000);
 for i = 1 : 1000
     chunk = rand([1 100 100], 'double');
@@ -137,7 +153,7 @@ end
 ```
 The above example could be run much faster if we do assignment chunk-wise and also sort the `indices` array in order to have the sequential access:  
 ```
-cnda = CachedNDArray([1000 100 100], 'double', 1, 'tmp', 'cache', 4, 1, 1, 0);
+cnda = CachedNDArray([1000 100 100], 1, 'nchunks', 4, 'fcaching', 1);
 indices = randperm(1000);
 indices_sort = sort(indices);
 for i = 1 : 4
